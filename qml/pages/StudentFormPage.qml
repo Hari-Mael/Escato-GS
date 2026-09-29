@@ -32,6 +32,7 @@ Item {
                 Label{text:"Adresse *"}; TextField{id: address; Layout.fillWidth:true}
                 Label{text:"Ancienne école"}; TextField{id: previousSchool; Layout.fillWidth:true}
                 Label{text:"Ancienne classe"}; TextField{id: previousClass; Layout.fillWidth:true}
+                Label{text:"Date d'entrée"}; TextField{id: previousDate; Layout.fillWidth:true}
                 Label{text:"Classe actuelle *"}
                 ComboBox { id: classBox; model:school.classes(); Layout.fillWidth:true }
                 Label{text:"Projet / carrière"}; TextField{id: career; Layout.fillWidth:true}
