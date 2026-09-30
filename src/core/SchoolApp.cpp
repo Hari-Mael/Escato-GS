@@ -20,11 +20,6 @@ SchoolApp::SchoolApp(QObject *parent) : QObject(parent)
         emit errorOccurred(m_db.lastError());
 }
 
-QString SchoolApp::passwordHash(const QString &password) const
-{
-    return QString(QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex());
-}
-
 bool SchoolApp::needsSetup() const
 {
     QSqlQuery q(m_db.db());
@@ -63,7 +58,7 @@ bool SchoolApp::createFirstAdmin(const QString &name, const QString &email, cons
 
     QSqlQuery q(db);
     q.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,'administrateur')");
-    q.addBindValue(n); q.addBindValue(e); q.addBindValue(passwordHash(password));
+    q.addBindValue(n); q.addBindValue(e); q.addBindValue(Database::hashPassword(password));
     if (!q.exec()) {
         db.rollback();
         emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cette adresse e-mail est déjà utilisée.") : q.lastError().text());
@@ -87,12 +82,23 @@ bool SchoolApp::login(const QString &email, const QString &password)
     q.addBindValue(email.trimmed());
     if (!q.exec() || !q.next()) return false;
     if (q.value(3).toString() != "active") return false;
+    const int uid = q.value(0).toInt();
     QSqlQuery p(m_db.db());
     p.prepare("SELECT password_hash FROM users WHERE id=?");
-    p.addBindValue(q.value(0));
-    if (!p.exec() || !p.next() || p.value(0).toString() != passwordHash(password)) return false;
+    p.addBindValue(uid);
+    if (!p.exec() || !p.next()) return false;
+    const QString stored = p.value(0).toString();
+    if (!Database::verifyPassword(password, stored)) return false;
 
-    m_userId = q.value(0).toInt();
+    if (Database::needsRehash(stored)) {
+        QSqlQuery r(m_db.db());
+        r.prepare("UPDATE users SET password_hash=? WHERE id=?");
+        r.addBindValue(Database::hashPassword(password));
+        r.addBindValue(uid);
+        r.exec();
+    }
+
+    m_userId = uid;
     m_userName = q.value(1).toString();
     m_role = q.value(2).toString();
     audit("login","users",m_userId);
@@ -140,18 +146,24 @@ bool SchoolApp::execute(const QString &sql, const QVariantList &bind)
 QVariantList SchoolApp::students(const QString &className, const QString &search) const
 {
     QVariantList out; QSqlQuery q(m_db.db());
-    QString sql="SELECT s.id,s.matricule,s.last_name,s.first_name,s.birth_date,s.birth_place,s.current_class,s.parent_phone,s.parent_email,s.address,s.previous_school,s.previous_class,s.desired_career,s.graduated_at,s.consecutive_missed_payments,u.account_status FROM students s LEFT JOIN users u ON u.id=s.user_id WHERE s.deleted_at IS NULL";
+    QString sql="SELECT s.id,s.matricule,s.last_name,s.first_name,s.birth_date,s.birth_place,s.current_class,s.parent_phone,s.parent_email,s.address,s.previous_school,s.previous_class,s.desired_career,s.graduated_at,s.consecutive_missed_payments,u.account_status,s.entry_date FROM students s LEFT JOIN users u ON u.id=s.user_id WHERE s.deleted_at IS NULL";
     if(!className.isEmpty()) sql+=" AND current_class=?";
     if(!search.isEmpty()) sql+=" AND (last_name LIKE ? OR first_name LIKE ? OR matricule LIKE ?)";
     sql+=" ORDER BY current_class,last_name,first_name";
     q.prepare(sql); if(!className.isEmpty()) q.addBindValue(className); if(!search.isEmpty()){QString x="%"+search+"%";q.addBindValue(x);q.addBindValue(x);q.addBindValue(x);}
     if(!q.exec()) return out;
-    while(q.next()){ QVariantMap m; QStringList keys={"id","matricule","lastName","firstName","birthDate","birthPlace","className","parentPhone","parentEmail","address","previousSchool","previousClass","desiredCareer","graduatedAt","missedPayments","accountStatus"}; for(int i=0;i<keys.size();++i)m[keys[i]]=q.value(i); out<<m; } return out;
+    while(q.next()){ QVariantMap m; QStringList keys={"id","matricule","lastName","firstName","birthDate","birthPlace","className","parentPhone","parentEmail","address","previousSchool","previousClass","desiredCareer","graduatedAt","missedPayments","accountStatus","entryDate"}; for(int i=0;i<keys.size();++i)m[keys[i]]=q.value(i); out<<m; } return out;
 }
 
 QVariantMap SchoolApp::student(int id) const
 {
-    auto list=students(); for(const auto &v:list){auto m=v.toMap();if(m["id"].toInt()==id)return m;} return {};
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT s.id,s.matricule,s.last_name,s.first_name,s.birth_date,s.birth_place,s.current_class,s.parent_phone,s.parent_email,s.address,s.previous_school,s.previous_class,s.desired_career,s.graduated_at,s.consecutive_missed_payments,u.account_status,s.entry_date FROM students s LEFT JOIN users u ON u.id=s.user_id WHERE s.deleted_at IS NULL AND s.id=?");
+    q.addBindValue(id);
+    if(!q.exec() || !q.next()) return {};
+    QVariantMap m; QStringList keys={"id","matricule","lastName","firstName","birthDate","birthPlace","className","parentPhone","parentEmail","address","previousSchool","previousClass","desiredCareer","graduatedAt","missedPayments","accountStatus","entryDate"};
+    for(int i=0;i<keys.size();++i) m[keys[i]]=q.value(i);
+    return m;
 }
 
 bool SchoolApp::addStudent(const QVariantMap &v)
@@ -159,19 +171,24 @@ bool SchoolApp::addStudent(const QVariantMap &v)
     if(!allowed({"administrateur","enseignant"})) return false;
     QSqlDatabase db=m_db.db(); db.transaction();
     QSqlQuery q(db);
-    QString matricule="ELV-"+QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
-    q.prepare(R"(INSERT INTO students(matricule,last_name,first_name,birth_date,birth_place,father_name,father_job,mother_name,mother_job,parent_phone,parent_email,address,previous_school,previous_class,current_class,desired_career,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?))");
-    QStringList k={"lastName","firstName","birthDate","birthPlace","fatherName","fatherJob","motherName","motherJob","parentPhone","parentEmail","address","previousSchool","previousClass","className","desiredCareer","photo"};
+    QString matricule=v.value("matricule").toString().trimmed();
+    if(matricule.isEmpty()) matricule="ELV-"+QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
+    q.prepare(R"(INSERT INTO students(matricule,last_name,first_name,birth_date,birth_place,father_name,father_job,mother_name,mother_job,parent_phone,parent_email,address,previous_school,previous_class,current_class,desired_career,photo,entry_date) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?))");
+    QStringList k={"lastName","firstName","birthDate","birthPlace","fatherName","fatherJob","motherName","motherJob","parentPhone","parentEmail","address","previousSchool","previousClass","className","desiredCareer","photo","entryDate"};
     q.addBindValue(matricule); for(auto &x:k) q.addBindValue(v.value(x));
-    if(!q.exec()){db.rollback();emit errorOccurred(q.lastError().text());return false;}
+    if(!q.exec()){
+        db.rollback();
+        emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce matricule est déjà utilisé par un autre élève.") : q.lastError().text());
+        return false;
+    }
     db.commit(); audit("create","student",q.lastInsertId().toInt()); emit dataChanged(); return true;
 }
 
 bool SchoolApp::updateStudent(int id,const QVariantMap &v)
 {
     if(!allowed({"administrateur","enseignant"}))return false;
-    QSqlQuery q(m_db.db()); q.prepare(R"(UPDATE students SET last_name=?,first_name=?,birth_date=?,birth_place=?,father_name=?,father_job=?,mother_name=?,mother_job=?,parent_phone=?,parent_email=?,address=?,previous_school=?,previous_class=?,current_class=?,desired_career=?,photo=?,updated_at=CURRENT_TIMESTAMP WHERE id=?)");
-    QStringList k={"lastName","firstName","birthDate","birthPlace","fatherName","fatherJob","motherName","motherJob","parentPhone","parentEmail","address","previousSchool","previousClass","className","desiredCareer","photo"}; for(auto &x:k)q.addBindValue(v.value(x));q.addBindValue(id); if(!q.exec())return false;audit("update","student",id);emit dataChanged();return true;
+    QSqlQuery q(m_db.db()); q.prepare(R"(UPDATE students SET last_name=?,first_name=?,birth_date=?,birth_place=?,father_name=?,father_job=?,mother_name=?,mother_job=?,parent_phone=?,parent_email=?,address=?,previous_school=?,previous_class=?,current_class=?,desired_career=?,photo=?,entry_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?)");
+    QStringList k={"lastName","firstName","birthDate","birthPlace","fatherName","fatherJob","motherName","motherJob","parentPhone","parentEmail","address","previousSchool","previousClass","className","desiredCareer","photo","entryDate"}; for(auto &x:k)q.addBindValue(v.value(x));q.addBindValue(id); if(!q.exec())return false;audit("update","student",id);emit dataChanged();return true;
 }
 
 bool SchoolApp::deleteStudent(int id){ if(!allowed({"administrateur"}))return false; return execute("UPDATE students SET deleted_at=CURRENT_TIMESTAMP WHERE id=?",{id}); }
@@ -201,7 +218,7 @@ bool SchoolApp::addTeacher(const QVariantMap &v)
     if(!allowed({"administrateur"}))return false;
     if(v.value("password").toString().size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}
     QSqlDatabase db=m_db.db();db.transaction();QSqlQuery q(db);
-    q.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?, 'enseignant')");q.addBindValue(v["name"]);q.addBindValue(v["email"]);q.addBindValue(passwordHash(v.value("password").toString()));
+    q.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?, 'enseignant')");q.addBindValue(v["name"]);q.addBindValue(v["email"]);q.addBindValue(Database::hashPassword(v.value("password").toString()));
     if(!q.exec()){db.rollback();return false;}int uid=q.lastInsertId().toInt();
     q.prepare(R"(INSERT INTO teacher_profiles(user_id,identity_number,cnaps_number,mle_number,contact,address,dob,place_of_birth,number_of_children,marital_status,religion,subject,occupation,employment_type,hiring_date,contract_end_date,comment,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?))");
     QStringList k={"cin","cnaps","mle","contact","address","dob","birthPlace","children","maritalStatus","religion","subject","occupation","employmentType","hiringDate","contractEndDate","comment","photo"};q.addBindValue(uid);for(auto &x:k)q.addBindValue(v.value(x));if(!q.exec()){db.rollback();return false;}db.commit();audit("create","teacher",uid);emit dataChanged();return true;
@@ -333,7 +350,7 @@ bool SchoolApp::processPaymentReminders()
 static QString csvField(const QVariant &value)
 {
     QString s=value.toString();
-    s.replace('"','""');
+    s.replace(QLatin1Char('"'), QLatin1String("\"\""));
     return QString("\"") + s + QString("\"");
 }
 
@@ -457,11 +474,11 @@ bool SchoolApp::createUser(const QVariantMap &v){
     if(!allowed({"administrateur"}))return false;
     if(v.value("name").toString().trimmed().isEmpty()||v.value("email").toString().trimmed().isEmpty()||!roles().contains(v.value("role").toString())){emit errorOccurred(QStringLiteral("Nom, e-mail et rôle valides requis."));return false;}
     if(v.value("password").toString().size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}
-    return execute("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)",{v["name"],v["email"],passwordHash(v["password"].toString()),v["role"]});}
+    return execute("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)",{v["name"],v["email"],Database::hashPassword(v["password"].toString()),v["role"]});}
 bool SchoolApp::updateUserRole(int id,const QString &role){if(!allowed({"administrateur"})||id==m_userId)return false;return execute("UPDATE users SET role=? WHERE id=?",{role,id});}
 bool SchoolApp::blockUser(int id,const QString &category,const QString &reason){if(!allowed({"administrateur","comptable","enseignant"})||id==m_userId)return false;return execute("UPDATE users SET account_status='blocked',blocked_category=?,blocked_reason=? WHERE id=?", {category,reason,id});}
 bool SchoolApp::unblockUser(int id){if(!allowed({"administrateur","comptable"}))return false;return execute("UPDATE users SET account_status='active',blocked_category=NULL,blocked_reason=NULL,requires_password_reset=1 WHERE id=?", {id});}
-bool SchoolApp::resetPassword(int userId,const QString &newPassword){if(!allowed({"administrateur"}))return false;if(newPassword.size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}return execute("UPDATE users SET password_hash=?,requires_password_reset=0 WHERE id=?", {passwordHash(newPassword),userId});}
+bool SchoolApp::resetPassword(int userId,const QString &newPassword){if(!allowed({"administrateur"}))return false;if(newPassword.size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}return execute("UPDATE users SET password_hash=?,requires_password_reset=0 WHERE id=?", {Database::hashPassword(newPassword),userId});}
 
 QVariantList SchoolApp::announcements() const
 {
