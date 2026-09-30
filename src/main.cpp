@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("school", &school);
     engine.rootContext()->setContextProperty("printer", &printer);
 
-    const QUrl url(QStringLiteral("qrc:/qt/qml/ESCATO/qml/Main.qml"));
+    const QUrl url(QStringLiteral("qrc:/ESCATO/qml/Main.qml"));
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed,
                      &app, [] { QCoreApplication::exit(-1); },
                      Qt::QueuedConnection);
