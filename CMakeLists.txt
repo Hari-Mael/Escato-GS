@@ -7,11 +7,11 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Sql PrintSupport Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Quick Sql PrintSupport Widgets Network)
 
 qt_standard_project_setup()
 
-qt_add_executable(ESCATO
+qt_add_executable(escato_app
     src/main.cpp
     src/core/SchoolApp.cpp
     src/core/SchoolApp.h
@@ -21,7 +21,7 @@ qt_add_executable(ESCATO
     src/core/PrintManager.h
 )
 
-qt_add_qml_module(ESCATO
+qt_add_qml_module(escato_app
     URI ESCATO
     VERSION 1.0
     QML_FILES
@@ -47,14 +47,14 @@ qt_add_qml_module(ESCATO
         qml/pages/BulletinPage.qml
 )
 
-qt_add_resources(ESCATO "escato_resources"
+qt_add_resources(escato_app "escato_resources"
     PREFIX "/"
     FILES
         assets/logo.png
 )
 
-target_include_directories(ESCATO PRIVATE src)
+target_include_directories(escato_app PRIVATE src)
 
-target_link_libraries(ESCATO
-    PRIVATE Qt6::Quick Qt6::Sql Qt6::PrintSupport Qt6::Widgets
+target_link_libraries(escato_app
+    PRIVATE Qt6::Quick Qt6::Sql Qt6::PrintSupport Qt6::Widgets Qt6::Network
 )
