@@ -21,6 +21,7 @@ Item {
                 Label{text:info.firstName+" "+info.lastName; font.pixelSize:28;font.bold:true;color:"#0B2A43"}
                 Label{text:"Matricule : "+info.matricule}
                 Label{text:"Classe : "+info.className}
+                Label{text:"Date d'entrée : "+info.entryDate}
                 Label{text:"Date de naissance : "+info.birthDate+" — "+info.birthPlace}
                 Label{text:"Téléphone parent : "+info.parentPhone}
                 Label{text:"E-mail parent : "+info.parentEmail}
