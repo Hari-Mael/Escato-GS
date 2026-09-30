@@ -42,7 +42,7 @@ Item {
                     radius: 10
                     color: "white"
                     border.color: "#DCE5ED"
-                    Column { anchors.centerIn: parent; spacing: 4; Label { text: modelData[0]; color: "#637381" }; Label { text: Number(modelData[1]).toLocaleString(Qt.locale(), 'f', 0) + " Ar"; font.pixelSize: 20; font.bold: true } }
+                    Column { anchors.centerIn: parent; spacing: 4; Label { text: modelData[0]; color: "#637381" } Label { text: Number(modelData[1]).toLocaleString(Qt.locale(), 'f', 0) + " Ar"; font.pixelSize: 20; font.bold: true } }
                 }
             }
         }
@@ -74,26 +74,26 @@ Item {
                     }
                     Label { text: message; color: messageOk ? "#2E7D32" : "#C62828" }
                     ListView { Layout.fillWidth: true; Layout.fillHeight: true; model: expensesModel; clip: true
-                        delegate: Rectangle { width: parent.width; height: 48; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.date; Layout.preferredWidth: 100 }; Label { text: modelData.category; Layout.preferredWidth: 130 }; Label { text: modelData.description; Layout.fillWidth: true }; Label { text: Number(modelData.amount).toLocaleString(Qt.locale(), 'f', 0) + " Ar"; Layout.preferredWidth: 130 }; Label { text: modelData.method; Layout.preferredWidth: 120 }; Label { text: modelData.accountCode; Layout.preferredWidth: 90 } } }
+                        delegate: Rectangle { width: parent.width; height: 48; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.date; Layout.preferredWidth: 100 } Label { text: modelData.category; Layout.preferredWidth: 130 } Label { text: modelData.description; Layout.fillWidth: true } Label { text: Number(modelData.amount).toLocaleString(Qt.locale(), 'f', 0) + " Ar"; Layout.preferredWidth: 130 } Label { text: modelData.method; Layout.preferredWidth: 120 } Label { text: modelData.accountCode; Layout.preferredWidth: 90 } } }
                     }
                 }
             }
 
             Item {
                 ListView { anchors.fill: parent; model: journalModel; clip: true
-                    delegate: Rectangle { width: parent.width; height: 54; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.date; Layout.preferredWidth: 100 }; Label { text: modelData.journal; Layout.preferredWidth: 90 }; Label { text: modelData.accountCode; Layout.preferredWidth: 90 }; Label { text: modelData.lineLabel; Layout.fillWidth: true }; Label { text: Number(modelData.debit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 120 }; Label { text: Number(modelData.credit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 120 } } }
+                    delegate: Rectangle { width: parent.width; height: 54; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.date; Layout.preferredWidth: 100 } Label { text: modelData.journal; Layout.preferredWidth: 90 } Label { text: modelData.accountCode; Layout.preferredWidth: 90 } Label { text: modelData.lineLabel; Layout.fillWidth: true } Label { text: Number(modelData.debit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 120 } Label { text: Number(modelData.credit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 120 } } }
                 }
             }
 
             Item {
                 ListView { anchors.fill: parent; model: balanceModel; clip: true
-                    delegate: Rectangle { width: parent.width; height: 52; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.code; Layout.preferredWidth: 90 }; Label { text: modelData.label; Layout.fillWidth: true }; Label { text: Number(modelData.debit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 130 }; Label { text: Number(modelData.credit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 130 }; Label { text: Number(modelData.balance).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 130 } } }
+                    delegate: Rectangle { width: parent.width; height: 52; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.code; Layout.preferredWidth: 90 } Label { text: modelData.label; Layout.fillWidth: true } Label { text: Number(modelData.debit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 130 } Label { text: Number(modelData.credit).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 130 } Label { text: Number(modelData.balance).toLocaleString(Qt.locale(), 'f', 0); Layout.preferredWidth: 130 } } }
                 }
             }
 
             Item {
                 ListView { anchors.fill: parent; model: accounts; clip: true
-                    delegate: Rectangle { width: parent.width; height: 50; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.code; Layout.preferredWidth: 100 }; Label { text: modelData.label; Layout.fillWidth: true }; Label { text: modelData.type; Layout.preferredWidth: 120 } } }
+                    delegate: Rectangle { width: parent.width; height: 50; color: index % 2 ? "#FAFBFC" : "white"; RowLayout { anchors.fill: parent; anchors.margins: 10; Label { text: modelData.code; Layout.preferredWidth: 100 } Label { text: modelData.label; Layout.fillWidth: true } Label { text: modelData.type; Layout.preferredWidth: 120 } } }
                 }
             }
 
