@@ -124,7 +124,6 @@ private:
     QString m_userName;
     QString m_role;
 
-    QString passwordHash(const QString &password) const;
     bool allowed(const QStringList &roles) const;
     void audit(const QString &action, const QString &entity, int entityId, const QString &details = QString());
     bool execute(const QString &sql, const QVariantList &bind = {});
