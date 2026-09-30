@@ -9,4 +9,6 @@ public:
     Q_INVOKABLE bool printStudentList(const QString &className = QString());
     Q_INVOKABLE bool printTeacherList();
     Q_INVOKABLE bool exportStudentsPdf(const QString &path, const QString &className = QString());
+    Q_INVOKABLE bool printStudentCertificate(int studentId);
+    Q_INVOKABLE bool exportStudentCertificatePdf(const QString &path, int studentId);
 };
