@@ -7,7 +7,7 @@ Item{
     Component.onCompleted:refresh()
     Connections{target:school;function onDataChanged(){refresh()}}
     ColumnLayout{anchors.fill:parent;spacing:15
-        RowLayout{Label{text:"Cours";font.pixelSize:28;font.bold:true};Item{Layout.fillWidth:true};Button{text:"➕ Créer un cours";onClicked:form.open()}}
+        RowLayout{Label{text:"Cours";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}Button{text:"➕ Créer un cours";onClicked:form.open()}}
         ComboBox{id:filter;model:["Toutes les classes"].concat(school.classes());onCurrentTextChanged:refresh()}
         ListView{Layout.fillWidth:true;Layout.fillHeight:true;model:rows
             delegate:Rectangle{width:parent.width;height:65;color:index%2?"#FAFBFC":"white"
