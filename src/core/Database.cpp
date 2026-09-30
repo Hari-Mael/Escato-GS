@@ -4,11 +4,72 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QCryptographicHash>
+#include <QPasswordDigestor>
+#include <QRandomGenerator>
 #include <QDebug>
 
-static QString hashPassword(const QString &s)
+namespace {
+constexpr int kPbkdf2Iterations = 210000;
+constexpr int kSaltBytes = 16;
+constexpr int kKeyBytes = 32;
+
+QByteArray randomBytes(int n)
+{
+    QByteArray b(n, Qt::Uninitialized);
+    for (int i = 0; i < n; ++i)
+        b[i] = static_cast<char>(QRandomGenerator::system()->generate() & 0xFF);
+    return b;
+}
+
+QByteArray pbkdf2(const QString &password, const QByteArray &salt, int iterations)
+{
+    return QPasswordDigestor::deriveKeyPbkdf2(QCryptographicHash::Sha256, password.toUtf8(), salt, iterations, kKeyBytes);
+}
+
+bool constantTimeEquals(const QByteArray &a, const QByteArray &b)
+{
+    if (a.size() != b.size()) return false;
+    unsigned char diff = 0;
+    for (int i = 0; i < a.size(); ++i)
+        diff |= static_cast<unsigned char>(a[i]) ^ static_cast<unsigned char>(b[i]);
+    return diff == 0;
+}
+
+// Ancien format (versions < ce correctif) : SHA-256 sans sel. Utilisé uniquement par
+// migrate() pour détecter et retirer l'admin par défaut historique "admin123".
+QString legacyHashPassword(const QString &s)
 {
     return QString(QCryptographicHash::hash(s.toUtf8(), QCryptographicHash::Sha256).toHex());
+}
+}
+
+QString Database::hashPassword(const QString &password)
+{
+    const QByteArray salt = randomBytes(kSaltBytes);
+    const QByteArray key = pbkdf2(password, salt, kPbkdf2Iterations);
+    return QStringLiteral("pbkdf2$%1$%2$%3").arg(kPbkdf2Iterations).arg(QString::fromLatin1(salt.toHex()), QString::fromLatin1(key.toHex()));
+}
+
+bool Database::verifyPassword(const QString &password, const QString &stored)
+{
+    if (stored.startsWith(QStringLiteral("pbkdf2$"))) {
+        const QStringList p = stored.split(QLatin1Char('$'));
+        if (p.size() != 4) return false;
+        bool ok = false;
+        const int iterations = p[1].toInt(&ok);
+        if (!ok || iterations <= 0) return false;
+        const QByteArray salt = QByteArray::fromHex(p[2].toLatin1());
+        const QByteArray expected = QByteArray::fromHex(p[3].toLatin1());
+        return constantTimeEquals(pbkdf2(password, salt, iterations), expected);
+    }
+    // Compat ascendante : anciens hash SHA-256 non salés, remplacés au prochain login réussi.
+    const QByteArray legacy = QCryptographicHash::hash(password.toUtf8(), QCryptographicHash::Sha256).toHex();
+    return constantTimeEquals(legacy, stored.toLatin1());
+}
+
+bool Database::needsRehash(const QString &stored)
+{
+    return !stored.startsWith(QStringLiteral("pbkdf2$%1$").arg(kPbkdf2Iterations));
 }
 
 Database::Database(QObject *parent) : QObject(parent)
@@ -27,6 +88,7 @@ bool Database::open()
     }
     exec("PRAGMA foreign_keys = ON");
     exec("PRAGMA journal_mode = WAL");
+    exec("PRAGMA busy_timeout = 5000");
     return createSchema() && migrate() && seed();
 }
 
@@ -83,6 +145,7 @@ bool Database::createSchema()
             graduated_at TEXT,
             consecutive_missed_payments INTEGER NOT NULL DEFAULT 0,
             photo TEXT,
+            entry_date TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             deleted_at TEXT
@@ -301,15 +364,25 @@ bool Database::createSchema()
     return true;
 }
 
+bool Database::columnExists(const QString &table, const QString &column)
+{
+    QSqlQuery q(m_db);
+    if (!q.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) return false;
+    while (q.next())
+        if (q.value(1).toString() == column) return true;
+    return false;
+}
+
 bool Database::migrate()
 {
     // Bases existantes : students.deleted_at n'existait pas (suppression logique cassée).
-    QSqlQuery q(m_db);
-    if (!q.exec("PRAGMA table_info(students)")) return false;
-    bool hasDeletedAt = false;
-    while (q.next())
-        if (q.value(1).toString() == "deleted_at") hasDeletedAt = true;
-    if (!hasDeletedAt && !exec("ALTER TABLE students ADD COLUMN deleted_at TEXT"))
+    if (!columnExists(QStringLiteral("students"), QStringLiteral("deleted_at"))
+        && !exec("ALTER TABLE students ADD COLUMN deleted_at TEXT"))
+        return false;
+
+    // Bases existantes : date d'entrée/inscription ajoutée après coup.
+    if (!columnExists(QStringLiteral("students"), QStringLiteral("entry_date"))
+        && !exec("ALTER TABLE students ADD COLUMN entry_date TEXT"))
         return false;
 
     // Anciennes versions : un compte administrateur codé en dur (admin@myschool.local / mot de passe
@@ -320,7 +393,7 @@ bool Database::migrate()
     legacy.prepare("UPDATE users SET deleted_at=CURRENT_TIMESTAMP, account_status='blocked', "
                    "email='supprime+'||id||'@invalide.local' "
                    "WHERE email='admin@myschool.local' AND password_hash=? AND deleted_at IS NULL");
-    legacy.addBindValue(hashPassword(QStringLiteral("admin123")));
+    legacy.addBindValue(legacyHashPassword(QStringLiteral("admin123")));
     if (!legacy.exec()) {
         qWarning() << legacy.lastError().text();
         return false;
