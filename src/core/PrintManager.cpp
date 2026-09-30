@@ -8,6 +8,7 @@
 #include <QPixmap>
 #include <QFontMetrics>
 #include <QDialog>
+#include <QDate>
 #include <functional>
 
 namespace {
@@ -43,21 +44,29 @@ double drawOfficialHeader(Page &pg, const QString &documentTitle)
     }
 
     p.setPen(Qt::black);
-    p.setFont(QFont("Arial", 15, QFont::Bold));
-    pg.text(left + 95, top + 24, "École Sacre Coeur");
+    p.setFont(QFont("Arial", 13, QFont::Bold));
+    pg.text(left + 95, top + 12, "Ecole Sacré-Cœur");
 
-    p.setFont(QFont("Arial", 10));
-    pg.text(left + 95, top + 45, "BP 85 Tolagnaro");
-    pg.text(left + 95, top + 63, "034 52 812 71");
+    p.setFont(QFont("Arial", 9));
+    pg.text(left + 95, top + 27, "Anosy");
+    pg.text(left + 95, top + 41, "BP 85");
+    pg.text(left + 95, top + 55, "Tél: 0345281271");
+    pg.text(left + 95, top + 69, "e-mail : escafor@yahoo.com");
+    pg.text(left + 95, top + 83, "Tolagnaro");
+
+    p.setFont(QFont("Arial", 8));
+    pg.cell(380, top + 8, right - 380, "Autorisation d'ouverture");
+    pg.cell(380, top + 22, right - 380, "N° : 127 / 2024 – MEN");
+    pg.cell(380, top + 36, right - 380, "Du 15 Juillet 2024");
 
     p.setPen(QPen(QColor("#B7B7B7"), 1));
-    p.drawLine(pg.px(left), pg.px(top + 94), pg.px(right), pg.px(top + 94));
+    p.drawLine(pg.px(left), pg.px(top + 108), pg.px(right), pg.px(top + 108));
 
     p.setPen(Qt::black);
     p.setFont(QFont("Arial", 16, QFont::Bold));
-    pg.text(left, top + 122, documentTitle);
+    pg.text(left, top + 136, documentTitle);
 
-    return top + 155;
+    return top + 167;
 }
 
 void drawFooter(Page &pg)
@@ -66,7 +75,7 @@ void drawFooter(Page &pg)
     pg.p.drawLine(pg.px(45), pg.px(805), pg.px(555), pg.px(805));
     pg.p.setPen(QColor("#555555"));
     pg.p.setFont(QFont("Arial", 8));
-    pg.text(45, 823, "ESCATO — École Sacre Coeur — Document administratif");
+    pg.text(45, 823, "ESCATO — Ecole Sacré-Cœur — Document administratif");
 }
 
 struct Column { double x, w; QString title; };
@@ -129,6 +138,67 @@ void drawTeachers(Page &pg)
     }, q);
 }
 
+// Reproduction fidèle du formulaire papier « CERTIFICAT DE SCOLARITE » de l'établissement,
+// avec deux champs auto-remplis absents du formulaire papier d'origine : le numéro matricule
+// et la date d'inscription (entry_date), en plus des champs déjà présents sur le papier.
+void drawCheckbox(Page &pg, double x, double y, const QString &label)
+{
+    const int s = pg.px(9);
+    pg.p.drawRect(pg.px(x), pg.px(y) - s, s, s);
+    pg.text(x + 14, y, label);
+}
+
+bool drawCertificate(Page &pg, int studentId)
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT matricule,last_name,first_name,birth_date,birth_place,father_name,mother_name,"
+              "current_class,previous_class,entry_date FROM students WHERE id=? AND deleted_at IS NULL");
+    q.addBindValue(studentId);
+    if (!q.exec() || !q.next()) return false;
+
+    const QString matricule = q.value(0).toString();
+    const QString lastName = q.value(1).toString();
+    const QString firstName = q.value(2).toString();
+    const QString birthDate = q.value(3).toString();
+    const QString birthPlace = q.value(4).toString();
+    const QString fatherName = q.value(5).toString();
+    const QString motherName = q.value(6).toString();
+    const QString currentClass = q.value(7).toString();
+    const QString previousClass = q.value(8).toString();
+    const QString entryDate = q.value(9).toString();
+
+    const QDate today = QDate::currentDate();
+    const int startYear = today.month() >= 9 ? today.year() : today.year() - 1;
+    const QString academicYear = QString("%1 – %2").arg(startYear).arg(startYear + 1);
+
+    double y = drawOfficialHeader(pg, "CERTIFICAT DE SCOLARITE");
+    pg.p.setFont(QFont("Arial", 11));
+
+    pg.text(45, y, "Année Scolaire " + academicYear); y += 34;
+    pg.text(45, y, "Nom : " + lastName); y += 26;
+    pg.text(45, y, "Prénoms : " + firstName); y += 26;
+    pg.text(45, y, "Date et lieu de naissance : " + birthDate + (birthPlace.isEmpty() ? "" : (" à " + birthPlace))); y += 26;
+    pg.text(45, y, "Nom du père : " + fatherName); y += 26;
+    pg.text(45, y, "Nom de la mère : " + motherName); y += 26;
+    pg.text(45, y, "Inscrit(e) sous le numéro matricule : " + matricule); y += 26;
+    pg.text(45, y, "Date d'inscription : " + entryDate); y += 26;
+    pg.text(45, y, "Actuellement en classe de : " + currentClass); y += 26;
+    pg.text(45, y, "Dernière classe suivie : " + previousClass); y += 40;
+
+    pg.text(45, y, "Le présent certificat est délivré pour servir et valoir ce que de droit"); y += 32;
+    pg.text(80, y, "Usage :");
+    drawCheckbox(pg, 140, y, "Pièce justificative");
+    drawCheckbox(pg, 300, y, "Scolarité");
+    y += 32;
+    pg.text(45, y, "Validité : moins de trois mois"); y += 60;
+
+    pg.text(360, y, "Tolagnaro, le " + today.toString("dd/MM/yyyy")); y += 60;
+    pg.text(400, y, "Frère Directeur");
+
+    drawFooter(pg);
+    return true;
+}
+
 void render(QPrinter &printer, const std::function<void(Page &)> &draw)
 {
     printer.setPageSize(QPageSize(QPageSize::A4));
@@ -170,4 +240,25 @@ bool PrintManager::printTeacherList()
     if (dlg.exec() != QDialog::Accepted) return false;
     render(printer, [&](Page &pg) { drawTeachers(pg); });
     return true;
+}
+
+bool PrintManager::printStudentCertificate(int studentId)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dlg(&printer);
+    if (dlg.exec() != QDialog::Accepted) return false;
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawCertificate(pg, studentId); });
+    return ok;
+}
+
+bool PrintManager::exportStudentCertificatePdf(const QString &path, int studentId)
+{
+    if (path.isEmpty()) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawCertificate(pg, studentId); });
+    return ok;
 }
