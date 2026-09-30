@@ -61,3 +61,47 @@ jobs:
             echo "::error::L'application a planté au démarrage (code $code)"
             exit 1
           fi
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Qt6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.7.*'
+          arch: 'win64_msvc2019_64'
+          modules: 'qtsql'
+
+      - name: Configurer CMake
+        run: cmake -S . -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compiler
+        run: cmake --build build --config Release
+
+      - name: Packager (windeployqt)
+        run: |
+          mkdir dist
+          copy build\escato_app.exe dist\
+          windeployqt --qmldir qml --release dist\escato_app.exe
+
+      - name: Installer Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Compiler l'installateur (hors ligne)
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\escato.iss
+
+      - name: Publier le dossier portable
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESCATO-windows-portable
+          path: dist
+
+      - name: Publier l'installateur
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESCATO-windows-installer
+          path: dist-installer\ESCATO-Setup.exe
