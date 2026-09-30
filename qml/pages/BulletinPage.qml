@@ -6,7 +6,7 @@ Item{
     property var result:({})
     ColumnLayout{anchors.fill:parent;spacing:15
         Label{text:"Bulletins";font.pixelSize:28;font.bold:true}
-        RowLayout{ComboBox{id:students;model:rows;Layout.fillWidth:true;textRole:"label";valueRole:"value"};ComboBox{id:term;model:school.terms()};Button{text:"Générer";onClicked:result=school.bulletin(students.currentValue,term.currentText)}}
+        RowLayout{ComboBox{id:students;model:rows;Layout.fillWidth:true;textRole:"label";valueRole:"value"}ComboBox{id:term;model:school.terms()}Button{text:"Générer";onClicked:result=school.bulletin(students.currentValue,term.currentText)}}
         Rectangle{Layout.fillWidth:true;Layout.fillHeight:true;color:"white";radius:14
             Column{anchors.fill:parent;anchors.margins:20;spacing:12
                 Label{text:result.student ? result.student.firstName+" "+result.student.lastName : "Sélectionnez un élève";font.pixelSize:24;font.bold:true}
