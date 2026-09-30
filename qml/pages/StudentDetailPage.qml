@@ -13,6 +13,7 @@ Item {
             Item{Layout.fillWidth:true}
             Button{text:"← Retour";onClicked:back()}
             Button{text:"🖨 Imprimer la liste";onClicked:printer.printStudentList(info.className)}
+            Button{text:"🖨 Certificat de scolarité";onClicked:printer.printStudentCertificate(studentId)}
         }
         Rectangle {
             Layout.fillWidth:true; Layout.fillHeight:true; radius:16; color:"white"
