@@ -7,11 +7,11 @@ Item{
     Component.onCompleted:refresh()
     Connections{target:school;function onDataChanged(){refresh()}}
     ColumnLayout{anchors.fill:parent;spacing:15
-        RowLayout{Label{text:"Examens";font.pixelSize:28;font.bold:true};Item{Layout.fillWidth:true};Button{text:"➕ Planifier";onClicked:form.open()}}
+        RowLayout{Label{text:"Examens";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}Button{text:"➕ Planifier";onClicked:form.open()}}
         ListView{Layout.fillWidth:true;Layout.fillHeight:true;model:rows
             delegate:Rectangle{width:parent.width;height:62;color:index%2?"#FAFBFC":"white"
                 Row{anchors.fill:parent;anchors.margins:12;spacing:20
-                    Label{text:modelData.date;width:110};Label{text:modelData.className;width:100};Label{text:modelData.subject;width:150};Label{text:modelData.title;width:200};Label{text:modelData.term;width:120};Label{text:"/ "+modelData.maxScore;width:70}
+                    Label{text:modelData.date;width:110}Label{text:modelData.className;width:100}Label{text:modelData.subject;width:150}Label{text:modelData.title;width:200}Label{text:modelData.term;width:120}Label{text:"/ "+modelData.maxScore;width:70}
                     Button{text:"Notes";onClicked:{gradeExamId=modelData.id;grades.open()}}
                 }
             }
