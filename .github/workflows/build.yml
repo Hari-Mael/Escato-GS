@@ -24,7 +24,11 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             ninja-build build-essential \
             qt6-base-dev qt6-declarative-dev qt6-declarative-dev-tools \
-            libqt6sql6-sqlite
+            libqt6sql6-sqlite \
+            qml6-module-qtquick qml6-module-qtquick-controls \
+            qml6-module-qtquick-layouts qml6-module-qtquick-templates \
+            qml6-module-qtquick-window qml6-module-qtqml-workerscript \
+            qml6-module-qtqml qml6-module-qtquick-dialogs
 
       - name: Configurer CMake
         run: cmake -S . -B build -G Ninja
@@ -80,7 +84,7 @@ jobs:
 
       - name: Compiler l'installateur (hors ligne)
         run: |
-          "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\escato.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\escato.iss
 
       - name: Publier le dossier portable
         uses: actions/upload-artifact@v4
