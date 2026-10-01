@@ -34,36 +34,3 @@ Propriétaire — tous droits réservés. Toute utilisation, reproduction ou dis
 Contact
 
 Pour toute question, démonstration ou demande d'installation, contactez l'équipe ESCATO-GS
-
-## Symptôme
-Après installation via ESCATO-Setup.exe (généré par le workflow GitHub Actions), double-cliquer sur escato_app.exe (ou le raccourci) ne fait rien d'observable :
-- Aucune fenêtre ne s'ouvre
-- Aucune icône n'apparaît dans la barre des tâches
-- Aucun message d'erreur
-
-## Environnement
-- Windows 10
-- Build produit par .github/workflows/build.yml (job build-windows), Qt 6.7.x MSVC 2019 64-bit
-- Installateur généré via Inno Setup (installer/escato.iss)
-
-## Déjà corrigé (n'est pas la cause actuelle)
-- [x] CMakeLists.txt : ajout de WIN32_EXECUTABLE TRUE (via set_target_properties) — supprime la fenêtre console qui flashait avant, mais le problème de fond persiste
-- [x] windeployqt : ajout de --compiler-runtime pour embarquer les DLL du runtime Visual C++
-- [x] Workflow CI : build + packaging + installeur passent tous au vert sur GitHub Actions
-
-## À vérifier (prochaine étape, pas encore fait / résultat pas encore communiqué)
-Lancer depuis PowerShell pour capturer un éventuel message silencieusement perdu lors d'un double-clic :
-```powershell
-cd "C:\Program Files\ESCATO"
-.\escato_app.exe
-```
-
-Vérifier aussi :
-- Présence de `platforms\qwindows.dll` dans le dossier d'installation
-- Historique de protection Windows Defender (mise en quarantaine silencieuse possible)
-- Observateur d'événements Windows → Journaux Windows → Application (ligne "Erreur" au moment du lancement)
-
-## Hypothèses non encore écartées
-- Plugin de plateforme Qt manquant (qwindows.dll)
-- Antivirus bloquant l'exécutable non signé
-- Dépendance manquante non détectée par windeployqt
