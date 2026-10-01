@@ -56,7 +56,6 @@ jobs:
           export QT_QPA_PLATFORM=offscreen
           export HOME=$RUNNER_TEMP
           timeout 5 ./build/escato_app || code=$?
-          # 124 = timeout normal (app tourne sans crash) ; tout autre code = échec réel
           if [ "${code:-0}" != "124" ] && [ "${code:-0}" != "0" ]; then
             echo "::error::L'application a planté au démarrage (code $code)"
             exit 1
@@ -73,7 +72,9 @@ jobs:
         with:
           version: '6.7.*'
           arch: 'win64_msvc2019_64'
-          modules: 'qtsql'
+
+      - name: Installer Ninja
+        run: choco install ninja --no-progress -y
 
       - name: Configurer CMake
         run: cmake -S . -B build -G "Ninja" -DCMAKE_BUILD_TYPE=Release
