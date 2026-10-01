@@ -77,7 +77,7 @@ jobs:
         run: |
           mkdir dist
           copy build\escato_app.exe dist\
-          windeployqt --qmldir qml --release dist\escato_app.exe
+          windeployqt --qmldir qml --release --compiler-runtime dist\escato_app.exe
 
       - name: Installer Inno Setup
         run: choco install innosetup --no-progress -y
