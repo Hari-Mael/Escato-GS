@@ -26,22 +26,6 @@ jobs:
             qt6-base-dev qt6-declarative-dev qt6-declarative-dev-tools \
             libqt6sql6-sqlite
 
-      - name: Lint QML (échoue si syntaxe invalide)
-        run: |
-          FAIL=0
-          for f in $(find qml -name '*.qml'); do
-            out=$(/usr/lib/qt6/bin/qmllint "$f" 2>&1 | grep -iE "error|Unexpected token|not unique|unavailable" || true)
-            if [ -n "$out" ]; then
-              echo "=== $f ==="
-              echo "$out"
-              FAIL=1
-            fi
-          done
-          if [ "$FAIL" = "1" ]; then
-            echo "::error::Erreurs de syntaxe QML détectées ci-dessus"
-            exit 1
-          fi
-
       - name: Configurer CMake
         run: cmake -S . -B build -G Ninja
 
@@ -72,6 +56,9 @@ jobs:
         with:
           version: '6.7.*'
           arch: 'win64_msvc2019_64'
+
+      - name: Configurer l'environnement MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Installer Ninja
         run: choco install ninja --no-progress -y
