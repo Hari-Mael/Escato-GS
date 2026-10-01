@@ -12,7 +12,6 @@ find_package(Qt6 REQUIRED COMPONENTS Quick Sql PrintSupport Widgets Network)
 qt_standard_project_setup()
 
 qt_add_executable(escato_app
-    WIN32_EXECUTABLE TRUE
     src/main.cpp
     src/core/SchoolApp.cpp
     src/core/SchoolApp.h
@@ -20,6 +19,10 @@ qt_add_executable(escato_app
     src/core/Database.h
     src/core/PrintManager.cpp
     src/core/PrintManager.h
+)
+
+set_target_properties(escato_app PROPERTIES
+    WIN32_EXECUTABLE TRUE
 )
 
 qt_add_qml_module(escato_app
