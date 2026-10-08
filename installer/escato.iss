@@ -46,8 +46,19 @@ Name: "{group}\Désinstaller {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
+; windeployqt copie vc_redist.x64.exe mais ne l'exécute pas : sans lui, l'exécutable ne démarre pas sur un poste vierge.
+Filename: "{app}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installation de Microsoft Visual C++ Redistributable..."; Flags: waituntilterminated skipifdoesntexist; Check: not VcRedistInstalled
 Filename: "{app}\{#MyAppExeName}"; Description: "Lancer {#MyAppName}"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; La base de données de l'utilisateur (%APPDATA%\ESCATO) n'est volontairement PAS supprimée
 ; à la désinstallation, pour ne jamais effacer les données scolaires par erreur.
+
+[Code]
+function VcRedistInstalled: Boolean;
+var
+  Installed: Cardinal;
+begin
+  Result := RegQueryDWordValue(HKLM64, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Installed', Installed)
+            and (Installed = 1);
+end;

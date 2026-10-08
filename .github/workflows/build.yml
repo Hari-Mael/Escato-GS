@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -51,6 +52,8 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,6 +89,34 @@ jobs:
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\escato.iss
 
+      - name: Préparer le paquet runtime (installateur en ligne)
+        id: runtime
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist-app, runtime-stage | Out-Null
+          Copy-Item dist\escato_app.exe dist-app\
+          Copy-Item dist\* runtime-stage -Recurse -Force
+          Remove-Item runtime-stage\escato_app.exe
+          Remove-Item runtime-stage\vc_redist*.exe -ErrorAction SilentlyContinue
+          Compress-Archive -Path runtime-stage\* -DestinationPath ESCATO-runtime-win64.zip -Force
+          $hash = (Get-FileHash ESCATO-runtime-win64.zip -Algorithm SHA256).Hash.ToLower()
+          "sha256=$hash" >> $env:GITHUB_OUTPUT
+          $version = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF_NAME.Substring(1) } else { '1.0.0' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Vérifier la complétude du paquet runtime
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory verify | Out-Null
+          Expand-Archive ESCATO-runtime-win64.zip verify -Force
+          $required = @('Qt6Core.dll', 'Qt6Gui.dll', 'Qt6Qml.dll', 'Qt6Quick.dll', 'platforms\qwindows.dll', 'sqldrivers\qsqlite.dll')
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path verify $_)) }
+          if ($missing) { throw "Fichiers manquants dans le runtime : $($missing -join ', ')" }
+
+      - name: Compiler l'installateur (en ligne)
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DRuntimeSha256=${{ steps.runtime.outputs.sha256 }} /DMyAppVersion=${{ steps.runtime.outputs.version }} installer\escato-online.iss
+
       - name: Publier le dossier portable
         uses: actions/upload-artifact@v4
         with:
@@ -97,3 +128,18 @@ jobs:
         with:
           name: ESCATO-windows-installer
           path: dist-installer\ESCATO-Setup.exe
+
+      - name: Publier l'installateur en ligne
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESCATO-windows-installer-online
+          path: dist-installer\ESCATO-Setup-Online.exe
+
+      - name: Publier la release (tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ESCATO-runtime-win64.zip
+            dist-installer/ESCATO-Setup-Online.exe
+            dist-installer/ESCATO-Setup.exe
