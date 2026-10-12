@@ -82,6 +82,17 @@ jobs:
           copy build\escato_app.exe dist\
           windeployqt --qmldir qml --release --compiler-runtime dist\escato_app.exe
 
+      - name: Smoke test Windows (démarrage)
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = 'offscreen'
+          $p = Start-Process dist\escato_app.exe -PassThru
+          Start-Sleep -Seconds 8
+          if ($p.HasExited) {
+            throw "escato_app.exe s'est fermé au démarrage (code $($p.ExitCode))"
+          }
+          Stop-Process -Id $p.Id -Force
+
       - name: Installer Inno Setup
         run: choco install innosetup --no-progress -y
 
