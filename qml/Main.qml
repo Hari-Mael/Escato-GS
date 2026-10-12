@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import ESCATO
+import "components"
+import "pages"
 
 ApplicationWindow {
     id: win
