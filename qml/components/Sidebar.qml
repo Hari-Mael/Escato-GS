@@ -4,7 +4,9 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+
     color: "#092B45"
+    clip: true
     property string currentPage: "dashboard"
     signal navigate(string page)
 
@@ -21,26 +23,18 @@ Rectangle {
             Layout.bottomMargin: 18
         }
 
-        Label {
-            text: school.currentUser
-            color: "#B9D7EF"
-            elide: Text.ElideRight
-            Layout.fillWidth: true
-            Layout.bottomMargin: 12
-        }
-
         Repeater {
             model: [
-                ["dashboard","Tableau de bord","⌂"],
-                ["students","Élèves","👨‍🎓"],
-                ["teachers","Enseignants","👨‍🏫"],
-                ["courses","Cours","📚"],
-                ["exams","Examens & notes","📝"],
-                ["finance","Paiements / factures","💰"],
-                ["accounting","Comptabilité","🧾"],
-                ["communication","Messages / annonces","💬"],
-                ["accounts","Comptes / sécurité","🔐"],
-                ["bulletin","Bulletins","📄"]
+                ["dashboard", "Tableau de bord", "⌂"],
+                ["students", "Élèves", "👨‍🎓"],
+                ["teachers", "Enseignants", "👨‍🏫"],
+                ["courses", "Cours", "📚"],
+                ["exams", "Examens & notes", "📝"],
+                ["finance", "Paiements / factures", "💰"],
+                ["accounting", "Comptabilité", "🧾"],
+                ["communication", "Messages / annonces", "💬"],
+                ["accounts", "Comptes / sécurité", "🔐"],
+                ["bulletin", "Bulletins", "📄"]
             ]
             delegate: Button {
                 Layout.fillWidth: true
@@ -52,9 +46,40 @@ Rectangle {
 
         Item { Layout.fillHeight: true }
 
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: "#1C4363"
+        }
+
+        Label {
+            text: school.currentUser
+            color: "white"
+            font.bold: true
+            elide: Text.ElideRight
+            Layout.fillWidth: true
+            Layout.topMargin: 6
+        }
+
+        Label {
+            text: school.currentRole
+            color: "#B9D7EF"
+            font.pixelSize: 12
+            elide: Text.ElideRight
+            Layout.fillWidth: true
+        }
+
         Button {
             Layout.fillWidth: true
-            text: "Déconnexion"
+            Layout.topMargin: 6
+            text: "⚙  Paramètres"
+            highlighted: root.currentPage === "settings"
+            onClicked: root.navigate("settings")
+        }
+
+        Button {
+            Layout.fillWidth: true
+            text: "⎋  Déconnexion"
             onClicked: school.logout()
         }
     }
