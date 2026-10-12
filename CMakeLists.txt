@@ -33,6 +33,7 @@ qt_add_qml_module(escato_app
         qml/components/Sidebar.qml
         qml/components/StatCard.qml
         qml/components/Toast.qml
+        qml/components/Announcement.qml
         qml/pages/LoginPage.qml
         qml/pages/SetupPage.qml
         qml/pages/DashboardPage.qml
