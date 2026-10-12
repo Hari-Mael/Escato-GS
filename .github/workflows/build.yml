@@ -89,6 +89,8 @@ jobs:
           $p = Start-Process dist\escato_app.exe -PassThru
           Start-Sleep -Seconds 8
           if ($p.HasExited) {
+            $journal = Join-Path $env:TEMP 'escato-qml.log'
+            if (Test-Path $journal) { Get-Content $journal }
             throw "escato_app.exe s'est fermé au démarrage (code $($p.ExitCode))"
           }
           Stop-Process -Id $p.Id -Force
