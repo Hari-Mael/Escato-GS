@@ -32,11 +32,13 @@ ApplicationWindow {
         id: appComponent
         RowLayout {
             spacing: 0
+
             Sidebar {
                 id: side
                 currentPage: win.page
-                Layout.preferredWidth: 240
+                Layout.preferredWidth: win.sidebarOpen ? 240 : 0
                 Layout.fillHeight: true
+                visible: Layout.preferredWidth > 0
                 onNavigate: function(target) { win.page = target }
             }
 
@@ -44,44 +46,66 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                StackLayout {
-                    id: pages
+                ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 28
-                    currentIndex: {
-                        var map={"dashboard":0,"students":1,"studentForm":2,"studentDetail":3,"teachers":4,"teacherForm":5,"courses":6,"exams":7,"finance":8,"accounting":9,"communication":10,"accounts":11,"bulletin":12}
-                        return map[win.page]===undefined?0:map[win.page]
+                    anchors.topMargin: 16
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Button {
+                            text: "☰"
+                            font.pixelSize: 18
+                            implicitWidth: 44
+                            onClicked: win.sidebarOpen = !win.sidebarOpen
+                        }
+
+                        Item { Layout.fillWidth: true }
                     }
 
-                    DashboardPage {}
+                    StackLayout {
+                        id: pages
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        currentIndex: {
+                            var map={"dashboard":0,"students":1,"studentForm":2,"studentDetail":3,"teachers":4,"teacherForm":5,"courses":6,"exams":7,"finance":8,"accounting":9,"communication":10,"accounts":11,"bulletin":12,"settings":13}
+                            return map[win.page]===undefined?0:map[win.page]
+                        }
 
-                    StudentsPage {
-                        onRegisterRequested: win.page="studentForm"
-                        onDetailRequested: function(id){ win.studentDetailId=id; win.page="studentDetail" }
+                        DashboardPage {}
+
+                        StudentsPage {
+                            onRegisterRequested: win.page="studentForm"
+                            onDetailRequested: function(id){ win.studentDetailId=id; win.page="studentDetail" }
+                        }
+
+                        StudentFormPage { onSaved: win.page="students" }
+
+                        StudentDetailPage {
+                            studentId: win.studentDetailId
+                            onBack: win.page="students"
+                        }
+
+                        TeachersPage { onCreateRequested: win.page="teacherForm" }
+                        TeacherFormPage { onSaved: win.page="teachers" }
+                        CoursesPage {}
+                        ExamsPage {}
+                        FinancePage {}
+                        AccountingPage {}
+                        CommunicationPage {}
+                        AccountsPage {}
+                        BulletinPage {}
+                        SettingsPage {}
                     }
-
-                    StudentFormPage { onSaved: win.page="students" }
-
-                    StudentDetailPage {
-                        studentId: win.studentDetailId
-                        onBack: win.page="students"
-                    }
-
-                    TeachersPage { onCreateRequested: win.page="teacherForm" }
-                    TeacherFormPage { onSaved: win.page="teachers" }
-                    CoursesPage {}
-                    ExamsPage {}
-                    FinancePage {}
-                    AccountingPage {}
-                    CommunicationPage {}
-                    AccountsPage {}
-                    BulletinPage {}
                 }
             }
         }
     }
 
     property string page: "dashboard"
+    property bool sidebarOpen: true
     property int studentDetailId: 0
 
     Toast { id: toast }
