@@ -110,11 +110,18 @@ ApplicationWindow {
 
     Toast { id: toast }
 
+    Announcement { id: announcement }
+
     Connections {
         target: school
         function onErrorOccurred(message) { toast.message = message; toast.open() }
         function onSessionChanged() {
-            if (!school.loggedIn) win.page = "dashboard"
+            if (school.loggedIn) {
+                announcement.show("AMETUR COR JESUS")
+            } else {
+                win.page = "dashboard"
+                announcement.show("AMETUR COR MARIAE")
+            }
         }
     }
 }
