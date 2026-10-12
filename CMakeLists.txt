@@ -49,6 +49,7 @@ qt_add_qml_module(escato_app
         qml/pages/CommunicationPage.qml
         qml/pages/AccountsPage.qml
         qml/pages/BulletinPage.qml
+        qml/pages/SettingsPage.qml
 )
 
 qt_add_resources(escato_app "escato_resources"
