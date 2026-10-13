@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 Item {
     signal registerRequested()
@@ -19,15 +20,15 @@ Item {
             Layout.fillWidth: true
             Label { text: "Liste des élèves"; font.pixelSize: 28; font.bold: true }
             Item { Layout.fillWidth: true }
-            Button { text: "➕ Inscrire un élève"; highlighted: true; onClicked: registerRequested() }
-            Button { text: "🖨 Print list"; onClicked: printer.printStudentList(selectedClass) }
+            AppButton { text: "➕ Inscrire un élève"; highlighted: true; onClicked: registerRequested() }
+            AppButton { text: "🖨 Print list"; onClicked: printer.printStudentList(selectedClass) }
         }
 
         RowLayout {
             Layout.fillWidth: true
-            TextField { Layout.fillWidth: true; placeholderText: "Rechercher nom, prénom ou matricule"; onTextChanged: { searchText=text; refresh() } }
+            AppTextField { Layout.fillWidth: true; placeholderText: "Rechercher nom, prénom ou matricule"; onTextChanged: { searchText=text; refresh() } }
             ComboBox { model: ["Toutes les classes"].concat(school.classes()); onCurrentTextChanged: { selectedClass=currentIndex===0?"":currentText; refresh() } }
-            Button { text: "Actualiser"; onClicked: refresh() }
+            AppButton { text: "Actualiser"; onClicked: refresh() }
         }
 
         Rectangle {
@@ -53,7 +54,7 @@ Item {
                         Label { text:modelData.firstName; width:150 }
                         Label { text:modelData.className; width:110; font.bold:true }
                         Label { text:modelData.parentPhone; width:150 }
-                        Button { text:"Profil"; onClicked: detailRequested(modelData.id) }
+                        AppButton { text:"Profil"; onClicked: detailRequested(modelData.id) }
                     }
                 }
             }

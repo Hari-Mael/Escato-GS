@@ -1,13 +1,14 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 Item{
     property var rows:[]
     property var teacherList:[]
     Component.onCompleted:refresh()
     Connections{target:school;function onDataChanged(){refresh()}}
     ColumnLayout{anchors.fill:parent;spacing:15
-        RowLayout{Label{text:"Cours";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}Button{text:"➕ Créer un cours";onClicked:form.open()}}
+        RowLayout{Label{text:"Cours";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}AppButton{text:"➕ Créer un cours";onClicked:form.open()}}
         ComboBox{id:filter;model:["Toutes les classes"].concat(school.classes());onCurrentTextChanged:refresh()}
         ListView{Layout.fillWidth:true;Layout.fillHeight:true;model:rows
             delegate:Rectangle{width:parent.width;height:65;color:index%2?"#FAFBFC":"white"
@@ -23,8 +24,8 @@ Item{
     }
     Dialog{id:form;title:"Créer un cours";modal:true;anchors.centerIn:Overlay.overlay;standardButtons:Dialog.Ok|Dialog.Cancel
         Column{spacing:8;width:400
-            TextField{id:title;placeholderText:"Titre"}
-            TextField{id:subject;placeholderText:"Matière"}
+            AppTextField{id:title;placeholderText:"Titre"}
+            AppTextField{id:subject;placeholderText:"Matière"}
             ComboBox{id:classBox;model:school.classes()}
             TextArea{id:description;placeholderText:"Description"}
             ComboBox{id:teacherBox;width:parent.width;model:teacherList;textRole:"label";valueRole:"value"}

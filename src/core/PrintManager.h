@@ -11,4 +11,6 @@ public:
     Q_INVOKABLE bool exportStudentsPdf(const QString &path, const QString &className = QString());
     Q_INVOKABLE bool printStudentCertificate(int studentId);
     Q_INVOKABLE bool exportStudentCertificatePdf(const QString &path, int studentId);
+    Q_INVOKABLE bool printStudentCard(int studentId);
+    Q_INVOKABLE bool exportStudentCardPdf(const QString &path, int studentId);
 };

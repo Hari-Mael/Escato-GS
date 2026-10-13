@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Sql PrintSupport Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Sql PrintSupport Widgets Network)
 
 qt_standard_project_setup()
 
@@ -19,6 +19,8 @@ qt_add_executable(escato_app
     src/core/Database.h
     src/core/PrintManager.cpp
     src/core/PrintManager.h
+    src/third_party/qrcodegen/qrcodegen.cpp
+    src/third_party/qrcodegen/qrcodegen.hpp
 )
 
 set_target_properties(escato_app PROPERTIES
@@ -33,6 +35,8 @@ qt_add_qml_module(escato_app
         qml/components/Sidebar.qml
         qml/components/StatCard.qml
         qml/components/Toast.qml
+        qml/components/AppButton.qml
+        qml/components/AppTextField.qml
         qml/components/Announcement.qml
         qml/pages/LoginPage.qml
         qml/pages/SetupPage.qml
@@ -62,5 +66,5 @@ qt_add_resources(escato_app "escato_resources"
 target_include_directories(escato_app PRIVATE src)
 
 target_link_libraries(escato_app
-    PRIVATE Qt6::Quick Qt6::Sql Qt6::PrintSupport Qt6::Widgets Qt6::Network
+    PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Sql Qt6::PrintSupport Qt6::Widgets Qt6::Network
 )

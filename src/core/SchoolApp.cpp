@@ -118,8 +118,14 @@ int SchoolApp::teacherCount() const { QSqlQuery q(m_db.db()); q.exec("SELECT COU
 int SchoolApp::courseCount() const { QSqlQuery q(m_db.db()); q.exec("SELECT COUNT(*) FROM courses"); return q.next()?q.value(0).toInt():0; }
 int SchoolApp::pendingInvoiceCount() const { QSqlQuery q(m_db.db()); q.exec("SELECT COUNT(*) FROM invoices WHERE status IN('pending','late')"); return q.next()?q.value(0).toInt():0; }
 
-QStringList SchoolApp::classes() const {
-    return {"6ème 1","6ème 2","6ème 3","6ème 4","5ème 1","5ème 2","5ème 3","4ème 1","4ème 2","4ème 3","3ème 1","3ème 2","3ème 3","2nde 1","2nde 2","2nde 3","2nde 4","1ère S1","1ère S2","1ère L1","1ère L2","T L1","T L2","T S1","T S2"};
+QStringList SchoolApp::classes() const
+{
+    return {"CP1","CP2","CE1","CE2","CM1","CM2",
+            "6ème 1","6ème 2","6ème 3","5ème 1","5ème 2","5ème 3",
+            "4ème 1","4ème 2","4ème 3","3ème 1","3ème 2","3ème 3",
+            "2nde 1","2nde 2","2nde 3","2nde 4",
+            "1ère L1","1ère L2","1ère S1","1ère S2",
+            "Terminale L1","Terminale L2","Terminale S"};
 }
 QStringList SchoolApp::roles() const { return {"administrateur","enseignant","eleve","parent","comptable"}; }
 QStringList SchoolApp::paymentMethods() const { return {"mvola","orange_money","airtel_money","virement","especes"}; }
@@ -509,4 +515,73 @@ QVariantList SchoolApp::dashboard() const
     q.exec("SELECT COUNT(*) FROM courses");q.next();QVariantMap c;c["label"]="Cours";c["value"]=q.value(0);out<<c;
     q.exec("SELECT COALESCE(SUM(amount),0) FROM payments WHERE strftime('%Y-%m',paid_at)=strftime('%Y-%m','now')");q.next();QVariantMap d;d["label"]="Paiements ce mois";d["value"]=q.value(0);out<<d;
     return out;
+}
+
+QVariantList SchoolApp::guardians(int studentId) const
+{
+    QVariantList out;
+    if (!allowed({"administrateur", "enseignant"})) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT sg.id,g.id,g.full_name,g.phone,g.email,g.relation,sg.is_primary "
+              "FROM student_guardians sg JOIN guardians g ON g.id=sg.guardian_id "
+              "WHERE sg.student_id=? ORDER BY sg.is_primary DESC, g.full_name");
+    q.addBindValue(studentId);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["linkId"] = q.value(0).toInt();
+        m["guardianId"] = q.value(1).toInt();
+        m["fullName"] = q.value(2).toString();
+        m["phone"] = q.value(3).toString();
+        m["email"] = q.value(4).toString();
+        m["relation"] = q.value(5).toString();
+        m["isPrimary"] = q.value(6).toInt() == 1;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addGuardian(int studentId, const QVariantMap &v)
+{
+    if (!allowed({"administrateur", "enseignant"})) return false;
+    const QString fullName = v.value("fullName").toString().trimmed();
+    const QString phone = v.value("phone").toString().trimmed();
+    const QString relation = v.value("relation").toString().trimmed();
+    if (fullName.isEmpty() || phone.isEmpty() || relation.isEmpty()) {
+        emit errorOccurred(QStringLiteral("Nom, téléphone et lien de parenté sont obligatoires."));
+        return false;
+    }
+    QSqlDatabase db = m_db.db();
+    if (!db.transaction()) return false;
+    QSqlQuery g(db);
+    g.prepare("INSERT INTO guardians(full_name,phone,email,relation) VALUES(?,?,?,?)");
+    g.addBindValue(fullName); g.addBindValue(phone);
+    g.addBindValue(v.value("email").toString().trimmed()); g.addBindValue(relation);
+    if (!g.exec()) { db.rollback(); emit errorOccurred(g.lastError().text()); return false; }
+    const int guardianId = g.lastInsertId().toInt();
+    QSqlQuery l(db);
+    l.prepare("INSERT INTO student_guardians(student_id,guardian_id,is_primary) VALUES(?,?,?)");
+    l.addBindValue(studentId); l.addBindValue(guardianId); l.addBindValue(v.value("isPrimary").toBool() ? 1 : 0);
+    if (!l.exec()) { db.rollback(); emit errorOccurred(l.lastError().text()); return false; }
+    db.commit();
+    audit("create", "guardian", guardianId, QStringLiteral("élève %1").arg(studentId));
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::removeGuardian(int linkId)
+{
+    if (!allowed({"administrateur"})) return false;
+    QSqlDatabase db = m_db.db();
+    if (!db.transaction()) return false;
+    QSqlQuery d(db);
+    d.prepare("DELETE FROM student_guardians WHERE id=?");
+    d.addBindValue(linkId);
+    if (!d.exec()) { db.rollback(); return false; }
+    QSqlQuery c(db);
+    c.exec("DELETE FROM guardians WHERE id NOT IN (SELECT guardian_id FROM student_guardians)");
+    db.commit();
+    audit("delete", "guardian_link", linkId);
+    emit dataChanged();
+    return true;
 }

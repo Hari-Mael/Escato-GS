@@ -10,6 +10,11 @@
 #include <QDialog>
 #include <QDate>
 #include <functional>
+#include <QFile>
+#include <QColor>
+#include <QFont>
+#include <QRectF>
+#include "third_party/qrcodegen/qrcodegen.hpp"
 
 namespace {
 
@@ -242,6 +247,89 @@ bool PrintManager::printTeacherList()
     return true;
 }
 
+
+bool drawStudentCard(Page &pg, int studentId)
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT matricule,last_name,first_name,current_class,photo FROM students WHERE id=? AND deleted_at IS NULL");
+    q.addBindValue(studentId);
+    if (!q.exec() || !q.next()) return false;
+
+    const QString matricule = q.value(0).toString();
+    const QString lastName = q.value(1).toString();
+    const QString firstName = q.value(2).toString();
+    const QString currentClass = q.value(3).toString();
+    const QString photoPath = q.value(4).toString();
+
+    const QDate today = QDate::currentDate();
+    const int startYear = today.month() >= 9 ? today.year() : today.year() - 1;
+    const QString academicYear = QString("%1 – %2").arg(startYear).arg(startYear + 1);
+
+    const double x = 45, y = 70, w = 340, h = 220;
+    QPainter &p = pg.p;
+
+    p.setPen(QPen(QColor("#D5DEE3"), 1));
+    p.setBrush(Qt::white);
+    p.drawRoundedRect(QRectF(pg.px(x), pg.px(y), pg.px(w), pg.px(h)), pg.px(12), pg.px(12));
+
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor("#0F9D8F"));
+    p.drawRoundedRect(QRectF(pg.px(x), pg.px(y), pg.px(w), pg.px(56)), pg.px(12), pg.px(12));
+    p.drawRect(QRectF(pg.px(x), pg.px(y + 40), pg.px(w), pg.px(16)));
+
+    p.setPen(Qt::white);
+    p.setFont(QFont("Arial", 12, QFont::Bold));
+    pg.text(x + 16, y + 24, QStringLiteral("ESCATO GS"));
+    p.setFont(QFont("Arial", 9));
+    pg.text(x + 16, y + 42, QStringLiteral("CARTE ÉLÈVE  •  ") + academicYear);
+
+    const double photoX = x + 16, photoY = y + 74, photoW = 92, photoH = 118;
+    p.setPen(QPen(QColor("#D5DEE3"), 1));
+    p.setBrush(QColor("#F1F5F7"));
+    p.drawRect(QRectF(pg.px(photoX), pg.px(photoY), pg.px(photoW), pg.px(photoH)));
+    if (!photoPath.isEmpty() && QFile::exists(photoPath)) {
+        const QPixmap photo(photoPath);
+        p.drawPixmap(QRect(pg.px(photoX), pg.px(photoY), pg.px(photoW), pg.px(photoH)),
+                     photo.scaled(pg.px(photoW), pg.px(photoH), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation));
+    }
+
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 13, QFont::Bold));
+    pg.cell(x + 124, y + 96, 200, lastName.toUpper());
+    p.setFont(QFont("Arial", 11));
+    pg.cell(x + 124, y + 116, 200, firstName);
+    p.setFont(QFont("Arial", 9));
+    p.setPen(QColor("#667085"));
+    pg.text(x + 124, y + 140, "Matricule");
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.cell(x + 124, y + 154, 200, matricule);
+    p.setFont(QFont("Arial", 9));
+    p.setPen(QColor("#667085"));
+    pg.text(x + 124, y + 172, "Classe");
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.cell(x + 124, y + 186, 200, currentClass);
+
+    const qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(matricule.toUtf8().constData(),
+                                                               qrcodegen::QrCode::Ecc::MEDIUM);
+    const int modules = qr.getSize();
+    const int border = 2;
+    const double qrSide = 60;
+    const double cell = qrSide / (modules + 2 * border);
+    const double qrX = x + w - qrSide - 16, qrY = y + h - qrSide - 16;
+    p.setPen(Qt::NoPen);
+    p.setBrush(Qt::white);
+    p.drawRect(QRectF(pg.px(qrX - 2), pg.px(qrY - 2), pg.px(qrSide + 4), pg.px(qrSide + 4)));
+    p.setBrush(QColor("#0B2A43"));
+    for (int yy = 0; yy < modules; ++yy)
+        for (int xx = 0; xx < modules; ++xx)
+            if (qr.getModule(xx, yy))
+                p.drawRect(QRectF(pg.px(qrX + (xx + border) * cell), pg.px(qrY + (yy + border) * cell),
+                                  pg.px(cell) + 1, pg.px(cell) + 1));
+    return true;
+}
+
 bool PrintManager::printStudentCertificate(int studentId)
 {
     QPrinter printer(QPrinter::HighResolution);
@@ -260,5 +348,26 @@ bool PrintManager::exportStudentCertificatePdf(const QString &path, int studentI
     printer.setOutputFileName(path);
     bool ok = false;
     render(printer, [&](Page &pg) { ok = drawCertificate(pg, studentId); });
+    return ok;
+}
+
+bool PrintManager::printStudentCard(int studentId)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dlg(&printer);
+    if (dlg.exec() != QDialog::Accepted) return false;
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawStudentCard(pg, studentId); });
+    return ok;
+}
+
+bool PrintManager::exportStudentCardPdf(const QString &path, int studentId)
+{
+    if (path.isEmpty()) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawStudentCard(pg, studentId); });
     return ok;
 }
