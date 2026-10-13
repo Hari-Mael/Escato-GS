@@ -730,3 +730,103 @@ QVariantMap SchoolApp::monthlyStats() const
         m["tardinessCount"] = tard.value(0).toInt();
     return m;
 }
+
+QString SchoolApp::setting(const QString &key) const
+{
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT value FROM settings WHERE key=?");
+    q.addBindValue(key);
+    return q.exec() && q.next() ? q.value(0).toString() : QString();
+}
+
+bool SchoolApp::setSetting(const QString &key, const QString &value)
+{
+    if (!allowed({"administrateur"})) return false;
+    const QString k = key.trimmed();
+    if (k.isEmpty()) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
+    q.addBindValue(k);
+    q.addBindValue(value.trimmed());
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("update", "setting", 0, k);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::academicPeriods() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name,start_date,end_date,is_active FROM academic_periods ORDER BY start_date DESC")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["startDate"] = q.value(2).toString();
+        m["endDate"] = q.value(3).toString();
+        m["isActive"] = q.value(4).toInt() == 1;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addAcademicPeriod(const QVariantMap &v)
+{
+    if (!allowed({"administrateur"})) return false;
+    const QString name = v.value("name").toString().trimmed();
+    const QDate start = QDate::fromString(v.value("startDate").toString().trimmed(), "yyyy-MM-dd");
+    const QDate end = QDate::fromString(v.value("endDate").toString().trimmed(), "yyyy-MM-dd");
+    if (name.isEmpty() || !start.isValid() || !end.isValid() || end < start) {
+        emit errorOccurred(QStringLiteral("Nom, date de début et date de fin valides requis (AAAA-MM-JJ)."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO academic_periods(name,start_date,end_date,is_active) VALUES(?,?,?,0)");
+    q.addBindValue(name);
+    q.addBindValue(start.toString("yyyy-MM-dd"));
+    q.addBindValue(end.toString("yyyy-MM-dd"));
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "academic_period", q.lastInsertId().toInt(), name);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::setActiveAcademicPeriod(int id)
+{
+    if (!allowed({"administrateur"})) return false;
+    QSqlDatabase db = m_db.db();
+    if (!db.transaction()) return false;
+    QSqlQuery off(db);
+    off.exec("UPDATE academic_periods SET is_active=0");
+    QSqlQuery on(db);
+    on.prepare("UPDATE academic_periods SET is_active=1 WHERE id=?");
+    on.addBindValue(id);
+    if (!on.exec() || on.numRowsAffected() != 1) { db.rollback(); return false; }
+    db.commit();
+    audit("update", "academic_period", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::auditLogs(int limit) const
+{
+    QVariantList out;
+    if (!allowed({"administrateur"})) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT a.created_at,COALESCE(u.name,'Système'),a.action,a.entity,a.entity_id,a.details "
+              "FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT ?");
+    q.addBindValue(limit > 0 ? limit : 200);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["createdAt"] = q.value(0).toString();
+        m["user"] = q.value(1).toString();
+        m["action"] = q.value(2).toString();
+        m["entity"] = q.value(3).toString();
+        m["entityId"] = q.value(4).toInt();
+        m["details"] = q.value(5).toString();
+        out << m;
+    }
+    return out;
+}
