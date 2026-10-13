@@ -298,6 +298,18 @@ bool SchoolApp::addPayment(const QVariantMap &v)
     q.addBindValue(paidAt); q.addBindValue(v.value("notes"));
     if(!q.exec()){ db.rollback(); emit errorOccurred(q.lastError().text()); return false; }
     const int pid=q.lastInsertId().toInt();
+    {
+        const QString year = paidAt.left(4);
+        QSqlQuery seq(db);
+        seq.prepare("SELECT COALESCE(MAX(CAST(substr(receipt_number,-5) AS INTEGER)),0)+1 FROM payments WHERE receipt_number LIKE ?");
+        seq.addBindValue(QStringLiteral("REC-%1-%").arg(year));
+        const int next = seq.exec() && seq.next() ? seq.value(0).toInt() : 1;
+        QSqlQuery rn(db);
+        rn.prepare("UPDATE payments SET receipt_number=? WHERE id=?");
+        rn.addBindValue(QStringLiteral("REC-%1-%2").arg(year).arg(next, 5, 10, QLatin1Char('0')));
+        rn.addBindValue(pid);
+        rn.exec();
+    }
 
     QSqlQuery inv(db);
     inv.prepare("SELECT id,amount FROM invoices WHERE student_id=? AND status IN('pending','late') ORDER BY due_date LIMIT 1");
@@ -584,4 +596,113 @@ bool SchoolApp::removeGuardian(int linkId)
     audit("delete", "guardian_link", linkId);
     emit dataChanged();
     return true;
+}
+
+bool SchoolApp::canViewStudent(int studentId) const
+{
+    if (m_userId <= 0) return false;
+    if (allowed({"administrateur", "enseignant", "comptable"})) return true;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT EXISTS(SELECT 1 FROM parent_student_links WHERE parent_user_id=? AND student_id=?) "
+              "OR EXISTS(SELECT 1 FROM students WHERE id=? AND user_id=?)");
+    q.addBindValue(m_userId); q.addBindValue(studentId);
+    q.addBindValue(studentId); q.addBindValue(m_userId);
+    return q.exec() && q.next() && q.value(0).toInt() == 1;
+}
+
+QVariantList SchoolApp::parentLinks(int studentId) const
+{
+    QVariantList out;
+    if (!allowed({"administrateur"})) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT l.id,u.id,u.name,u.email FROM parent_student_links l "
+              "JOIN users u ON u.id=l.parent_user_id WHERE l.student_id=? AND u.deleted_at IS NULL ORDER BY u.name");
+    q.addBindValue(studentId);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["linkId"] = q.value(0).toInt();
+        m["parentId"] = q.value(1).toInt();
+        m["name"] = q.value(2).toString();
+        m["email"] = q.value(3).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::linkParentByEmail(int studentId, const QString &email)
+{
+    if (!allowed({"administrateur"})) return false;
+    QSqlQuery u(m_db.db());
+    u.prepare("SELECT id FROM users WHERE lower(email)=lower(?) AND role='parent' AND deleted_at IS NULL");
+    u.addBindValue(email.trimmed());
+    if (!u.exec() || !u.next()) {
+        emit errorOccurred(QStringLiteral("Aucun compte parent avec cette adresse e-mail. Créez-le d'abord dans Comptes / sécurité."));
+        return false;
+    }
+    QSqlQuery l(m_db.db());
+    l.prepare("INSERT OR IGNORE INTO parent_student_links(parent_user_id,student_id) VALUES(?,?)");
+    l.addBindValue(u.value(0)); l.addBindValue(studentId);
+    if (!l.exec()) { emit errorOccurred(l.lastError().text()); return false; }
+    audit("link", "parent", u.value(0).toInt(), QStringLiteral("élève %1").arg(studentId));
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::unlinkParent(int linkId)
+{
+    if (!allowed({"administrateur"})) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM parent_student_links WHERE id=?");
+    q.addBindValue(linkId);
+    if (!q.exec()) return false;
+    audit("unlink", "parent", linkId);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::myStudents() const
+{
+    QVariantList out;
+    if (m_userId <= 0) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT s.id,s.matricule,s.last_name,s.first_name,s.current_class FROM students s "
+              "WHERE s.deleted_at IS NULL AND (s.id IN (SELECT student_id FROM parent_student_links WHERE parent_user_id=?) "
+              "OR s.user_id=?) ORDER BY s.last_name,s.first_name");
+    q.addBindValue(m_userId); q.addBindValue(m_userId);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["matricule"] = q.value(1).toString();
+        m["lastName"] = q.value(2).toString();
+        m["firstName"] = q.value(3).toString();
+        m["className"] = q.value(4).toString();
+        out << m;
+    }
+    return out;
+}
+
+QVariantMap SchoolApp::familyStudent(int studentId) const
+{
+    if (!canViewStudent(studentId)) return {};
+    return student(studentId);
+}
+
+QVariantList SchoolApp::familyInvoices(int studentId) const
+{
+    if (!canViewStudent(studentId)) return {};
+    return studentInvoices(studentId);
+}
+
+QVariantList SchoolApp::familyPayments(int studentId) const
+{
+    if (!canViewStudent(studentId)) return {};
+    return payments(studentId);
+}
+
+QVariantMap SchoolApp::familyBulletin(int studentId, const QString &term) const
+{
+    if (!canViewStudent(studentId)) return {};
+    return bulletin(studentId, term);
 }

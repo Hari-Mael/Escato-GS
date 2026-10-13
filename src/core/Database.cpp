@@ -168,6 +168,13 @@ bool Database::createSchema()
             UNIQUE(student_id, guardian_id)
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS parent_student_links(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            parent_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            UNIQUE(parent_user_id, student_id)
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -400,6 +407,14 @@ bool Database::migrate()
     // Bases existantes : date d'entrée/inscription ajoutée après coup.
     if (!columnExists(QStringLiteral("students"), QStringLiteral("entry_date"))
         && !exec("ALTER TABLE students ADD COLUMN entry_date TEXT"))
+        return false;
+
+    if (!columnExists(QStringLiteral("payments"), QStringLiteral("receipt_number"))
+        && !exec("ALTER TABLE payments ADD COLUMN receipt_number TEXT"))
+        return false;
+    if (!exec("UPDATE payments SET receipt_number='REC-'||substr(paid_at,1,4)||'-'||printf('%05d',"
+              "(SELECT COUNT(*) FROM payments p2 WHERE substr(p2.paid_at,1,4)=substr(payments.paid_at,1,4) AND p2.id<=payments.id)) "
+              "WHERE receipt_number IS NULL"))
         return false;
 
     // Anciennes versions : un compte administrateur codé en dur (admin@myschool.local / mot de passe

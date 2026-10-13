@@ -15,7 +15,7 @@ ApplicationWindow {
 
     Loader {
         anchors.fill: parent
-        sourceComponent: school.loggedIn ? appComponent : (school.needsSetup ? setupComponent : loginComponent)
+        sourceComponent: school.loggedIn ? (school.currentRole === "parent" || school.currentRole === "eleve" ? familyComponent : appComponent) : (school.needsSetup ? setupComponent : loginComponent)
     }
 
     Component {
@@ -26,6 +26,11 @@ ApplicationWindow {
     Component {
         id: setupComponent
         SetupPage {}
+    }
+
+    Component {
+        id: familyComponent
+        FamilyPortal {}
     }
 
     Component {
