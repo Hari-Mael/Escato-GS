@@ -618,6 +618,82 @@ bool drawAttestation(Page &pg, int studentId, const QString &kind)
     return true;
 }
 
+
+QString appreciationFor(double avg)
+{
+    if (avg >= 16) return QStringLiteral("Très bien");
+    if (avg >= 14) return QStringLiteral("Bien");
+    if (avg >= 12) return QStringLiteral("Assez bien");
+    if (avg >= 10) return QStringLiteral("Passable");
+    return QStringLiteral("Insuffisant");
+}
+
+bool drawBulletin(Page &pg, int studentId, const QString &term)
+{
+    QSqlQuery s(QSqlDatabase::database());
+    s.prepare("SELECT matricule,last_name,first_name,current_class FROM students WHERE id=? AND deleted_at IS NULL");
+    s.addBindValue(studentId);
+    if (!s.exec() || !s.next()) return false;
+
+    QSqlQuery g(QSqlDatabase::database());
+    g.prepare("SELECT c.subject,ROUND(AVG((g.score*20.0)/e.max_score),2) FROM grades g JOIN exams e ON e.id=g.exam_id "
+              "JOIN courses c ON c.id=e.course_id WHERE g.student_id=? AND e.term=? GROUP BY c.subject ORDER BY c.subject");
+    g.addBindValue(studentId);
+    g.addBindValue(term);
+    if (!g.exec()) return false;
+
+    double y = drawOfficialHeader(pg, QStringLiteral("BULLETIN DE NOTES - ") + term.toUpper());
+    QPainter &p = pg.p;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 11));
+    pg.text(45, y, QStringLiteral("Élève : ") + s.value(1).toString().toUpper() + " " + s.value(2).toString()); y += 22;
+    pg.text(45, y, QStringLiteral("Matricule : ") + s.value(0).toString()
+            + QStringLiteral("     Classe : ") + s.value(3).toString()); y += 34;
+
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.text(45, y, QStringLiteral("Matière"));
+    pg.text(340, y, QStringLiteral("Moyenne /20"));
+    pg.text(430, y, QStringLiteral("Appréciation"));
+    y += 8;
+    p.setPen(QPen(QColor("#D5DEE3"), 0.8));
+    p.drawLine(QPoint(pg.px(45), pg.px(y)), QPoint(pg.px(550), pg.px(y)));
+    y += 18;
+
+    double sum = 0;
+    int count = 0;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 10));
+    while (g.next()) {
+        const double avg = g.value(1).toDouble();
+        sum += avg;
+        ++count;
+        pg.cell(45, y, 280, g.value(0).toString());
+        pg.cell(340, y, 80, QString::number(avg, 'f', 2));
+        pg.cell(430, y, 120, appreciationFor(avg));
+        y += 20;
+    }
+    if (count == 0) {
+        pg.text(45, y, QStringLiteral("Aucune note enregistrée pour ce trimestre."));
+        y += 20;
+    }
+
+    y += 14;
+    p.setFont(QFont("Arial", 13, QFont::Bold));
+    const double general = count ? sum / count : 0;
+    pg.text(45, y, QStringLiteral("Moyenne générale : ")
+            + (count ? QString::number(general, 'f', 2) : QStringLiteral("—")) + QStringLiteral(" / 20"));
+    y += 24;
+    p.setFont(QFont("Arial", 11));
+    pg.text(45, y, QStringLiteral("Appréciation générale : ") + (count ? appreciationFor(general) : QStringLiteral("—")));
+
+    const double sigY = y + 90;
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.text(370, sigY, settingText("signatory_title", "Le Frère Directeur"));
+    p.setPen(QPen(QColor("#667085"), 0.8));
+    p.drawLine(QPoint(pg.px(360), pg.px(sigY + 60)), QPoint(pg.px(550), pg.px(sigY + 60)));
+    return true;
+}
+
 bool PrintManager::printStudentCertificate(int studentId)
 {
     QPrinter printer(QPrinter::HighResolution);
@@ -720,5 +796,26 @@ bool PrintManager::exportAttestationPdf(const QString &path, int studentId, cons
     printer.setOutputFileName(path);
     bool ok = false;
     render(printer, [&](Page &pg) { ok = drawAttestation(pg, studentId, kind); });
+    return ok;
+}
+
+bool PrintManager::printBulletin(int studentId, const QString &term)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dlg(&printer);
+    if (dlg.exec() != QDialog::Accepted) return false;
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawBulletin(pg, studentId, term); });
+    return ok;
+}
+
+bool PrintManager::exportBulletinPdf(const QString &path, int studentId, const QString &term)
+{
+    if (path.isEmpty()) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawBulletin(pg, studentId, term); });
     return ok;
 }
