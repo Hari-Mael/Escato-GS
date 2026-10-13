@@ -188,6 +188,11 @@ bool Database::createSchema()
             is_active INTEGER NOT NULL DEFAULT 0
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS class_tuitions(
+            class_name TEXT PRIMARY KEY,
+            monthly_amount REAL NOT NULL DEFAULT 0
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
