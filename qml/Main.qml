@@ -75,7 +75,7 @@ ApplicationWindow {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         currentIndex: {
-                            var map={"dashboard":0,"students":1,"studentForm":2,"studentDetail":3,"teachers":4,"teacherForm":5,"courses":6,"exams":7,"finance":8,"accounting":9,"communication":10,"accounts":11,"bulletin":12,"settings":13,"audit":14,"fees":15}
+                            var map={"dashboard":0,"students":1,"studentForm":2,"studentDetail":3,"teachers":4,"teacherForm":5,"courses":6,"exams":7,"finance":8,"accounting":9,"communication":10,"accounts":11,"bulletin":12,"settings":13,"audit":14,"fees":15,"roles":16}
                             return map[win.page]===undefined?0:map[win.page]
                         }
 
@@ -105,6 +105,7 @@ ApplicationWindow {
                         SettingsPage {}
                         AuditPage {}
                         FeesPage {}
+                        RolesPage {}
                     }
                 }
             }

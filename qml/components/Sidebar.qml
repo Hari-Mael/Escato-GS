@@ -36,7 +36,8 @@ Rectangle {
                 ["accounts", "Comptes / sécurité", "🔐"],
                 ["bulletin", "Bulletins", "📄"],
                 ["audit", "Journal d'audit", "📜"],
-                ["fees", "Frais et soldes", "🏷"]
+                ["fees", "Frais et soldes", "🏷"],
+                ["roles", "Rôles et permissions", "🛡"]
             ]
             delegate: AppButton {
                 Layout.fillWidth: true

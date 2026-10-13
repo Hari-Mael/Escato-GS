@@ -174,7 +174,7 @@ QVariantMap SchoolApp::student(int id) const
 
 bool SchoolApp::addStudent(const QVariantMap &v)
 {
-    if(!allowed({"administrateur","enseignant"})) return false;
+    if(!can("students.create")) return false;
     QSqlDatabase db=m_db.db(); db.transaction();
     QSqlQuery q(db);
     QString matricule=v.value("matricule").toString().trimmed();
@@ -192,16 +192,16 @@ bool SchoolApp::addStudent(const QVariantMap &v)
 
 bool SchoolApp::updateStudent(int id,const QVariantMap &v)
 {
-    if(!allowed({"administrateur","enseignant"}))return false;
+    if(!can("students.edit"))return false;
     QSqlQuery q(m_db.db()); q.prepare(R"(UPDATE students SET last_name=?,first_name=?,birth_date=?,birth_place=?,father_name=?,father_job=?,mother_name=?,mother_job=?,parent_phone=?,parent_email=?,address=?,previous_school=?,previous_class=?,current_class=?,desired_career=?,photo=?,entry_date=?,updated_at=CURRENT_TIMESTAMP WHERE id=?)");
     QStringList k={"lastName","firstName","birthDate","birthPlace","fatherName","fatherJob","motherName","motherJob","parentPhone","parentEmail","address","previousSchool","previousClass","className","desiredCareer","photo","entryDate"}; for(auto &x:k)q.addBindValue(v.value(x));q.addBindValue(id); if(!q.exec())return false;audit("update","student",id);emit dataChanged();return true;
 }
 
-bool SchoolApp::deleteStudent(int id){ if(!allowed({"administrateur"}))return false; return execute("UPDATE students SET deleted_at=CURRENT_TIMESTAMP WHERE id=?",{id}); }
-bool SchoolApp::graduateStudent(int id){ if(!allowed({"administrateur"}))return false; return execute("UPDATE students SET graduated_at=DATE('now') WHERE id=?",{id}); }
+bool SchoolApp::deleteStudent(int id){ if(!can("students.delete"))return false; return execute("UPDATE students SET deleted_at=CURRENT_TIMESTAMP WHERE id=?",{id}); }
+bool SchoolApp::graduateStudent(int id){ if(!can("students.delete"))return false; return execute("UPDATE students SET graduated_at=DATE('now') WHERE id=?",{id}); }
 bool SchoolApp::blockStudent(int id,const QString &reason)
 {
-    if(!allowed({"administrateur","enseignant"}))return false;
+    if(!can("students.block"))return false;
     QSqlQuery q(m_db.db());q.prepare("SELECT user_id FROM students WHERE id=?");q.addBindValue(id);if(!q.exec()||!q.next()||q.value(0).isNull())return false;
     return blockUser(q.value(0).toInt(),"discipline",reason);
 }
@@ -221,7 +221,7 @@ QVariantList SchoolApp::teachers(const QString &search) const
 
 bool SchoolApp::addTeacher(const QVariantMap &v)
 {
-    if(!allowed({"administrateur"}))return false;
+    if(!can("teachers.manage"))return false;
     if(v.value("password").toString().size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}
     QSqlDatabase db=m_db.db();db.transaction();QSqlQuery q(db);
     q.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?, 'enseignant')");q.addBindValue(v["name"]);q.addBindValue(v["email"]);q.addBindValue(Database::hashPassword(v.value("password").toString()));
@@ -232,41 +232,41 @@ bool SchoolApp::addTeacher(const QVariantMap &v)
 
 bool SchoolApp::updateTeacher(int id,const QVariantMap &v)
 {
-    if(!allowed({"administrateur"}))return false;QSqlQuery q(m_db.db());q.prepare("UPDATE users SET name=?,email=? WHERE id=?");q.addBindValue(v["name"]);q.addBindValue(v["email"]);q.addBindValue(id);if(!q.exec())return false;
+    if(!can("teachers.manage"))return false;QSqlQuery q(m_db.db());q.prepare("UPDATE users SET name=?,email=? WHERE id=?");q.addBindValue(v["name"]);q.addBindValue(v["email"]);q.addBindValue(id);if(!q.exec())return false;
     q.prepare(R"(UPDATE teacher_profiles SET identity_number=?,cnaps_number=?,mle_number=?,contact=?,address=?,dob=?,place_of_birth=?,number_of_children=?,marital_status=?,religion=?,subject=?,occupation=?,employment_type=?,hiring_date=?,contract_end_date=?,comment=?,photo=? WHERE user_id=?)");
     QStringList k={"cin","cnaps","mle","contact","address","dob","birthPlace","children","maritalStatus","religion","subject","occupation","employmentType","hiringDate","contractEndDate","comment","photo"};for(auto &x:k)q.addBindValue(v.value(x));q.addBindValue(id);if(!q.exec())return false;emit dataChanged();return true;
 }
-bool SchoolApp::deleteTeacher(int id){if(!allowed({"administrateur"}))return false;return execute("UPDATE users SET deleted_at=CURRENT_TIMESTAMP WHERE id=? AND role='enseignant'",{id});}
+bool SchoolApp::deleteTeacher(int id){if(!can("teachers.manage"))return false;return execute("UPDATE users SET deleted_at=CURRENT_TIMESTAMP WHERE id=? AND role='enseignant'",{id});}
 
 QVariantList SchoolApp::courses(const QString &className) const
 {
     QVariantList out;QSqlQuery q(m_db.db());QString sql="SELECT c.id,c.title,c.subject,c.class_name,c.description,c.teacher_id,COALESCE(u.name,'Non affecté') FROM courses c LEFT JOIN users u ON u.id=c.teacher_id";if(!className.isEmpty())sql+=" WHERE c.class_name=?";sql+=" ORDER BY c.class_name,c.subject";q.prepare(sql);if(!className.isEmpty())q.addBindValue(className);q.exec();while(q.next()){QVariantMap m;m["id"]=q.value(0);m["title"]=q.value(1);m["subject"]=q.value(2);m["className"]=q.value(3);m["description"]=q.value(4);m["teacherId"]=q.value(5);m["teacher"]=q.value(6);out<<m;}return out;
 }
-bool SchoolApp::addCourse(const QVariantMap &v){if(!allowed({"administrateur","enseignant"}))return false;return execute("INSERT INTO courses(title,subject,class_name,description,teacher_id) VALUES(?,?,?,?,?)",{v["title"],v["subject"],v["className"],v["description"],v["teacherId"]});}
-bool SchoolApp::updateCourse(int id,const QVariantMap &v){if(!allowed({"administrateur","enseignant"}))return false;return execute("UPDATE courses SET title=?,subject=?,class_name=?,description=?,teacher_id=? WHERE id=?", {v["title"],v["subject"],v["className"],v["description"],v["teacherId"],id});}
-bool SchoolApp::deleteCourse(int id){if(!allowed({"administrateur","enseignant"}))return false;return execute("DELETE FROM courses WHERE id=?",{id});}
+bool SchoolApp::addCourse(const QVariantMap &v){if(!can("courses.manage"))return false;return execute("INSERT INTO courses(title,subject,class_name,description,teacher_id) VALUES(?,?,?,?,?)",{v["title"],v["subject"],v["className"],v["description"],v["teacherId"]});}
+bool SchoolApp::updateCourse(int id,const QVariantMap &v){if(!can("courses.manage"))return false;return execute("UPDATE courses SET title=?,subject=?,class_name=?,description=?,teacher_id=? WHERE id=?", {v["title"],v["subject"],v["className"],v["description"],v["teacherId"],id});}
+bool SchoolApp::deleteCourse(int id){if(!can("courses.manage"))return false;return execute("DELETE FROM courses WHERE id=?",{id});}
 
 QVariantList SchoolApp::resources(int courseId) const
 {
     QVariantList out;QSqlQuery q(m_db.db());q.prepare("SELECT id,title,type,file_path,url FROM course_resources WHERE course_id=? ORDER BY title");q.addBindValue(courseId);q.exec();while(q.next()){QVariantMap m;m["id"]=q.value(0);m["title"]=q.value(1);m["type"]=q.value(2);m["filePath"]=q.value(3);m["url"]=q.value(4);out<<m;}return out;
 }
-bool SchoolApp::addResource(const QVariantMap &v){if(!allowed({"administrateur","enseignant"}))return false;return execute("INSERT INTO course_resources(course_id,title,type,file_path,url) VALUES(?,?,?,?,?)",{v["courseId"],v["title"],v["type"],v["filePath"],v["url"]});}
-bool SchoolApp::deleteResource(int id){if(!allowed({"administrateur","enseignant"}))return false;return execute("DELETE FROM course_resources WHERE id=?",{id});}
+bool SchoolApp::addResource(const QVariantMap &v){if(!can("courses.manage"))return false;return execute("INSERT INTO course_resources(course_id,title,type,file_path,url) VALUES(?,?,?,?,?)",{v["courseId"],v["title"],v["type"],v["filePath"],v["url"]});}
+bool SchoolApp::deleteResource(int id){if(!can("courses.manage"))return false;return execute("DELETE FROM course_resources WHERE id=?",{id});}
 
 QVariantList SchoolApp::exams() const
 {
     QVariantList out;QSqlQuery q("SELECT e.id,e.title,e.term,e.exam_date,e.max_score,e.course_id,c.title,c.subject,c.class_name FROM exams e JOIN courses c ON c.id=e.course_id ORDER BY e.exam_date DESC");while(q.next()){QVariantMap m;m["id"]=q.value(0);m["title"]=q.value(1);m["term"]=q.value(2);m["date"]=q.value(3);m["maxScore"]=q.value(4);m["courseId"]=q.value(5);m["course"]=q.value(6);m["subject"]=q.value(7);m["className"]=q.value(8);out<<m;}return out;
 }
-bool SchoolApp::addExam(const QVariantMap &v){if(!allowed({"administrateur","enseignant"}))return false;return execute("INSERT INTO exams(course_id,title,term,exam_date,max_score) VALUES(?,?,?,?,?)",{v["courseId"],v["title"],v["term"],v["date"],v["maxScore"]});}
-bool SchoolApp::updateExam(int id,const QVariantMap &v){if(!allowed({"administrateur","enseignant"}))return false;return execute("UPDATE exams SET course_id=?,title=?,term=?,exam_date=?,max_score=? WHERE id=?", {v["courseId"],v["title"],v["term"],v["date"],v["maxScore"],id});}
-bool SchoolApp::deleteExam(int id){if(!allowed({"administrateur","enseignant"}))return false;return execute("DELETE FROM exams WHERE id=?",{id});}
+bool SchoolApp::addExam(const QVariantMap &v){if(!can("exams.manage"))return false;return execute("INSERT INTO exams(course_id,title,term,exam_date,max_score) VALUES(?,?,?,?,?)",{v["courseId"],v["title"],v["term"],v["date"],v["maxScore"]});}
+bool SchoolApp::updateExam(int id,const QVariantMap &v){if(!can("exams.manage"))return false;return execute("UPDATE exams SET course_id=?,title=?,term=?,exam_date=?,max_score=? WHERE id=?", {v["courseId"],v["title"],v["term"],v["date"],v["maxScore"],id});}
+bool SchoolApp::deleteExam(int id){if(!can("exams.manage"))return false;return execute("DELETE FROM exams WHERE id=?",{id});}
 
 QVariantList SchoolApp::grades(int examId) const
 {
     QVariantList out;QSqlQuery q(m_db.db());q.prepare(R"(SELECT s.id,s.matricule,s.last_name,s.first_name,s.current_class,g.score,g.comment FROM students s JOIN exams e ON e.id=? LEFT JOIN grades g ON g.student_id=s.id AND g.exam_id=e.id WHERE s.current_class=(SELECT c.class_name FROM courses c JOIN exams e2 ON e2.course_id=c.id WHERE e2.id=?) AND s.deleted_at IS NULL ORDER BY s.last_name)");q.addBindValue(examId);q.addBindValue(examId);q.exec();while(q.next()){QVariantMap m;m["studentId"]=q.value(0);m["matricule"]=q.value(1);m["lastName"]=q.value(2);m["firstName"]=q.value(3);m["className"]=q.value(4);m["score"]=q.value(5).isNull()?QVariant():q.value(5);m["comment"]=q.value(6);out<<m;}return out;
 }
 bool SchoolApp::saveGrade(int examId,int studentId,double score,const QString &comment){
-    if(!allowed({"administrateur","enseignant"}))return false;
+    if(!can("grades.edit"))return false;
     QSqlQuery mq(m_db.db());mq.prepare("SELECT max_score FROM exams WHERE id=?");mq.addBindValue(examId);
     if(!mq.exec()||!mq.next())return false;
     if(!(score>=0.0 && score<=mq.value(0).toDouble())){emit errorOccurred(QStringLiteral("Note invalide : elle doit être comprise entre 0 et %1.").arg(mq.value(0).toInt()));return false;}
@@ -283,7 +283,7 @@ QVariantList SchoolApp::payments(int studentId) const
 }
 bool SchoolApp::addPayment(const QVariantMap &v)
 {
-    if(!allowed({"administrateur","comptable"})) return false;
+    if(!can("payments.create")) return false;
     const double amount = v.value("amount").toDouble();
     if(amount <= 0.0) return false;
     QSqlDatabase db=m_db.db();
@@ -350,17 +350,17 @@ QVariantList SchoolApp::studentInvoices(int studentId) const
 {
     QVariantList out;QSqlQuery q(m_db.db());q.prepare("SELECT id,period_month,due_date,amount,status,payment_id FROM invoices WHERE student_id=? ORDER BY due_date DESC");q.addBindValue(studentId);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","month","dueDate","amount","status","paymentId"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);out<<m;}return out;
 }
-bool SchoolApp::setStudentFee(int studentId,double amount){if(!allowed({"administrateur"}))return false;return execute("INSERT INTO student_fees(student_id,monthly_amount,set_by) VALUES(?,?,?)",{studentId,amount,m_userId});}
+bool SchoolApp::setStudentFee(int studentId,double amount){if(!can("fees.student"))return false;return execute("INSERT INTO student_fees(student_id,monthly_amount,set_by) VALUES(?,?,?)",{studentId,amount,m_userId});}
 bool SchoolApp::generateMonthlyInvoices(const QString &month)
 {
-    if(!allowed({"administrateur","comptable"}))return false;
+    if(!can("invoices.generate"))return false;
     QSqlQuery s(m_db.db());s.exec("SELECT id FROM students WHERE graduated_at IS NULL AND deleted_at IS NULL");
     while(s.next()){QSqlQuery f(m_db.db());f.prepare("SELECT COALESCE((SELECT monthly_amount FROM student_fees WHERE student_id=? ORDER BY id DESC LIMIT 1),(SELECT ct.monthly_amount FROM class_tuitions ct JOIN students st ON st.current_class=ct.class_name WHERE st.id=? AND ct.monthly_amount>0))");f.addBindValue(s.value(0));f.addBindValue(s.value(0));if(f.exec()&&f.next()&&!f.value(0).isNull()){QDate d=QDate::fromString(month+"-01","yyyy-MM-dd");if(!d.isValid())continue;QSqlQuery i(m_db.db());i.prepare("INSERT OR IGNORE INTO invoices(student_id,period_month,due_date,amount,status) VALUES(?,?,?,?, 'pending')");i.addBindValue(s.value(0));i.addBindValue(d.toString("yyyy-MM-dd"));i.addBindValue(d.addDays(9).toString("yyyy-MM-dd"));i.addBindValue(f.value(0));i.exec();}}
     emit dataChanged();return true;
 }
 bool SchoolApp::processPaymentReminders()
 {
-    if(!allowed({"administrateur","comptable"}))return false;
+    if(!can("invoices.remind"))return false;
     QSqlQuery q(m_db.db());q.exec("UPDATE invoices SET reminder_before_sent_at=COALESCE(reminder_before_sent_at,CURRENT_TIMESTAMP) WHERE status='pending' AND due_date=DATE('now','+3 day')");q.exec("UPDATE invoices SET status='late',reminder_late_sent_at=COALESCE(reminder_late_sent_at,CURRENT_TIMESTAMP) WHERE status='pending' AND due_date<DATE('now')");emit dataChanged();return true;
 }
 
@@ -395,7 +395,7 @@ QVariantList SchoolApp::chartOfAccounts() const
 
 bool SchoolApp::addAccount(const QString &code, const QString &label, const QString &type)
 {
-    if(!allowed({"administrateur","comptable"}) || code.trimmed().isEmpty() || label.trimmed().isEmpty()) return false;
+    if(!can("accounting.write") || code.trimmed().isEmpty() || label.trimmed().isEmpty()) return false;
     return execute("INSERT INTO chart_of_accounts(code,label,account_type) VALUES(?,?,?)",{code.trimmed(),label.trimmed(),type.trimmed().isEmpty()?"general":type.trimmed()});
 }
 
@@ -409,7 +409,7 @@ QVariantList SchoolApp::expenses() const
 
 bool SchoolApp::addExpense(const QVariantMap &v)
 {
-    if(!allowed({"administrateur","comptable"})) return false;
+    if(!can("accounting.write")) return false;
     const double amount=v.value("amount").toDouble(); if(amount<=0) return false;
     QSqlDatabase db=m_db.db(); if(!db.transaction()) return false;
     QSqlQuery q(db); q.prepare("INSERT INTO expenses(expense_date,category,description,amount,payment_method,reference,account_code,recorded_by) VALUES(?,?,?,?,?,?,?,?)");
@@ -459,7 +459,7 @@ QString SchoolApp::accountingExportDirectory() const
 
 bool SchoolApp::exportAccountingCsv(const QString &kind, const QString &filePath) const
 {
-    if(!allowed({"administrateur","comptable"}))return false;
+    if(!can("accounting.export"))return false;
     QString path=filePath.trimmed(); if(path.isEmpty()){QString ext="csv";path=accountingExportDirectory()+"/ESCATO_"+kind+"_"+QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss")+"."+ext;}
     QFile f(path);if(!f.open(QIODevice::WriteOnly|QIODevice::Text))return false;QTextStream out(&f);out.setEncoding(QStringConverter::Utf8);out<<QChar(0xFEFF);
     if(kind=="payments"){
@@ -489,34 +489,34 @@ QVariantList SchoolApp::users(const QString &role) const
     QVariantList out;QSqlQuery q(m_db.db());QString sql="SELECT id,name,email,role,account_status,blocked_reason,blocked_category,requires_password_reset FROM users WHERE deleted_at IS NULL";if(!role.isEmpty())sql+=" AND role=?";sql+=" ORDER BY name";q.prepare(sql);if(!role.isEmpty())q.addBindValue(role);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","name","email","role","status","blockedReason","blockedCategory","requiresPasswordReset"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);out<<m;}return out;
 }
 bool SchoolApp::createUser(const QVariantMap &v){
-    if(!allowed({"administrateur"}))return false;
+    if(!can("users.manage"))return false;
     if(v.value("name").toString().trimmed().isEmpty()||v.value("email").toString().trimmed().isEmpty()||!roles().contains(v.value("role").toString())){emit errorOccurred(QStringLiteral("Nom, e-mail et rôle valides requis."));return false;}
     if(v.value("password").toString().size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}
     return execute("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?,?)",{v["name"],v["email"],Database::hashPassword(v["password"].toString()),v["role"]});}
-bool SchoolApp::updateUserRole(int id,const QString &role){if(!allowed({"administrateur"})||id==m_userId)return false;return execute("UPDATE users SET role=? WHERE id=?",{role,id});}
-bool SchoolApp::blockUser(int id,const QString &category,const QString &reason){if(!allowed({"administrateur","comptable","enseignant"})||id==m_userId)return false;return execute("UPDATE users SET account_status='blocked',blocked_category=?,blocked_reason=? WHERE id=?", {category,reason,id});}
-bool SchoolApp::unblockUser(int id){if(!allowed({"administrateur","comptable"}))return false;return execute("UPDATE users SET account_status='active',blocked_category=NULL,blocked_reason=NULL,requires_password_reset=1 WHERE id=?", {id});}
-bool SchoolApp::resetPassword(int userId,const QString &newPassword){if(!allowed({"administrateur"}))return false;if(newPassword.size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}return execute("UPDATE users SET password_hash=?,requires_password_reset=0 WHERE id=?", {Database::hashPassword(newPassword),userId});}
+bool SchoolApp::updateUserRole(int id,const QString &role){if(!can("users.manage")||id==m_userId)return false;return execute("UPDATE users SET role=? WHERE id=?",{role,id});}
+bool SchoolApp::blockUser(int id,const QString &category,const QString &reason){if(!can("users.block")||id==m_userId)return false;return execute("UPDATE users SET account_status='blocked',blocked_category=?,blocked_reason=? WHERE id=?", {category,reason,id});}
+bool SchoolApp::unblockUser(int id){if(!can("users.unblock"))return false;return execute("UPDATE users SET account_status='active',blocked_category=NULL,blocked_reason=NULL,requires_password_reset=1 WHERE id=?", {id});}
+bool SchoolApp::resetPassword(int userId,const QString &newPassword){if(!can("users.manage"))return false;if(newPassword.size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}return execute("UPDATE users SET password_hash=?,requires_password_reset=0 WHERE id=?", {Database::hashPassword(newPassword),userId});}
 
 QVariantList SchoolApp::announcements() const
 {
     QVariantList out;QSqlQuery q("SELECT a.id,a.title,a.body,a.event_date,a.created_at,COALESCE(u.name,'') FROM announcements a LEFT JOIN users u ON u.id=a.created_by ORDER BY a.created_at DESC");while(q.next()){QVariantMap m;m["id"]=q.value(0);m["title"]=q.value(1);m["body"]=q.value(2);m["eventDate"]=q.value(3);m["createdAt"]=q.value(4);m["creator"]=q.value(5);out<<m;}return out;
 }
-bool SchoolApp::addAnnouncement(const QVariantMap &v){if(!allowed({"administrateur"}))return false;return execute("INSERT INTO announcements(created_by,title,body,event_date) VALUES(?,?,?,?)",{m_userId,v["title"],v["body"],v["eventDate"]});}
-bool SchoolApp::deleteAnnouncement(int id){if(!allowed({"administrateur"}))return false;return execute("DELETE FROM announcements WHERE id=?",{id});}
+bool SchoolApp::addAnnouncement(const QVariantMap &v){if(!can("communication.announcements"))return false;return execute("INSERT INTO announcements(created_by,title,body,event_date) VALUES(?,?,?,?)",{m_userId,v["title"],v["body"],v["eventDate"]});}
+bool SchoolApp::deleteAnnouncement(int id){if(!can("communication.announcements"))return false;return execute("DELETE FROM announcements WHERE id=?",{id});}
 
 QVariantList SchoolApp::tardiness() const
 {
     QVariantList out;QSqlQuery q("SELECT t.id,t.student_id,s.last_name||' '||s.first_name,t.occurred_at,t.note FROM tardiness_records t JOIN students s ON s.id=t.student_id ORDER BY t.occurred_at DESC");while(q.next()){QVariantMap m;m["id"]=q.value(0);m["studentId"]=q.value(1);m["student"]=q.value(2);m["date"]=q.value(3);m["note"]=q.value(4);out<<m;}return out;
 }
-bool SchoolApp::addTardiness(const QVariantMap &v){if(!allowed({"administrateur","enseignant"}))return false;return execute("INSERT INTO tardiness_records(student_id,recorded_by,occurred_at,note) VALUES(?,?,?,?)",{v["studentId"],m_userId,v["date"],v["note"]});}
+bool SchoolApp::addTardiness(const QVariantMap &v){if(!can("tardiness.record"))return false;return execute("INSERT INTO tardiness_records(student_id,recorded_by,occurred_at,note) VALUES(?,?,?,?)",{v["studentId"],m_userId,v["date"],v["note"]});}
 
 QVariantList SchoolApp::examPeriods() const
 {
     QVariantList out;QSqlQuery q("SELECT id,label,start_date,end_date,is_active FROM exam_periods ORDER BY start_date DESC");while(q.next()){QVariantMap m;m["id"]=q.value(0);m["label"]=q.value(1);m["startDate"]=q.value(2);m["endDate"]=q.value(3);m["active"]=q.value(4).toBool();out<<m;}return out;
 }
-bool SchoolApp::addExamPeriod(const QVariantMap &v){if(!allowed({"administrateur"}))return false;return execute("INSERT INTO exam_periods(label,start_date,end_date,is_active,activated_by) VALUES(?,?,?,?,?)",{v["label"],v["startDate"],v["endDate"],v["active"].toBool(),m_userId});}
-bool SchoolApp::toggleExamPeriod(int id){if(!allowed({"administrateur"}))return false;execute("UPDATE exam_periods SET is_active=0");return execute("UPDATE exam_periods SET is_active=1,activated_by=? WHERE id=?",{m_userId,id});}
+bool SchoolApp::addExamPeriod(const QVariantMap &v){if(!can("periods.manage"))return false;return execute("INSERT INTO exam_periods(label,start_date,end_date,is_active,activated_by) VALUES(?,?,?,?,?)",{v["label"],v["startDate"],v["endDate"],v["active"].toBool(),m_userId});}
+bool SchoolApp::toggleExamPeriod(int id){if(!can("periods.manage"))return false;execute("UPDATE exam_periods SET is_active=0");return execute("UPDATE exam_periods SET is_active=1,activated_by=? WHERE id=?",{m_userId,id});}
 
 QVariantList SchoolApp::dashboard() const
 {
@@ -532,7 +532,7 @@ QVariantList SchoolApp::dashboard() const
 QVariantList SchoolApp::guardians(int studentId) const
 {
     QVariantList out;
-    if (!allowed({"administrateur", "enseignant"})) return out;
+    if (!can("guardians.read")) return out;
     QSqlQuery q(m_db.db());
     q.prepare("SELECT sg.id,g.id,g.full_name,g.phone,g.email,g.relation,sg.is_primary "
               "FROM student_guardians sg JOIN guardians g ON g.id=sg.guardian_id "
@@ -555,7 +555,7 @@ QVariantList SchoolApp::guardians(int studentId) const
 
 bool SchoolApp::addGuardian(int studentId, const QVariantMap &v)
 {
-    if (!allowed({"administrateur", "enseignant"})) return false;
+    if (!can("guardians.add")) return false;
     const QString fullName = v.value("fullName").toString().trimmed();
     const QString phone = v.value("phone").toString().trimmed();
     const QString relation = v.value("relation").toString().trimmed();
@@ -583,7 +583,7 @@ bool SchoolApp::addGuardian(int studentId, const QVariantMap &v)
 
 bool SchoolApp::removeGuardian(int linkId)
 {
-    if (!allowed({"administrateur"})) return false;
+    if (!can("guardians.remove")) return false;
     QSqlDatabase db = m_db.db();
     if (!db.transaction()) return false;
     QSqlQuery d(db);
@@ -601,7 +601,7 @@ bool SchoolApp::removeGuardian(int linkId)
 bool SchoolApp::canViewStudent(int studentId) const
 {
     if (m_userId <= 0) return false;
-    if (allowed({"administrateur", "enseignant", "comptable"})) return true;
+    if (can("students.view")) return true;
     QSqlQuery q(m_db.db());
     q.prepare("SELECT EXISTS(SELECT 1 FROM parent_student_links WHERE parent_user_id=? AND student_id=?) "
               "OR EXISTS(SELECT 1 FROM students WHERE id=? AND user_id=?)");
@@ -613,7 +613,7 @@ bool SchoolApp::canViewStudent(int studentId) const
 QVariantList SchoolApp::parentLinks(int studentId) const
 {
     QVariantList out;
-    if (!allowed({"administrateur"})) return out;
+    if (!can("parents.link")) return out;
     QSqlQuery q(m_db.db());
     q.prepare("SELECT l.id,u.id,u.name,u.email FROM parent_student_links l "
               "JOIN users u ON u.id=l.parent_user_id WHERE l.student_id=? AND u.deleted_at IS NULL ORDER BY u.name");
@@ -632,7 +632,7 @@ QVariantList SchoolApp::parentLinks(int studentId) const
 
 bool SchoolApp::linkParentByEmail(int studentId, const QString &email)
 {
-    if (!allowed({"administrateur"})) return false;
+    if (!can("parents.link")) return false;
     QSqlQuery u(m_db.db());
     u.prepare("SELECT id FROM users WHERE lower(email)=lower(?) AND role='parent' AND deleted_at IS NULL");
     u.addBindValue(email.trimmed());
@@ -651,7 +651,7 @@ bool SchoolApp::linkParentByEmail(int studentId, const QString &email)
 
 bool SchoolApp::unlinkParent(int linkId)
 {
-    if (!allowed({"administrateur"})) return false;
+    if (!can("parents.link")) return false;
     QSqlQuery q(m_db.db());
     q.prepare("DELETE FROM parent_student_links WHERE id=?");
     q.addBindValue(linkId);
@@ -741,7 +741,7 @@ QString SchoolApp::setting(const QString &key) const
 
 bool SchoolApp::setSetting(const QString &key, const QString &value)
 {
-    if (!allowed({"administrateur"})) return false;
+    if (!can("settings.manage")) return false;
     const QString k = key.trimmed();
     if (k.isEmpty()) return false;
     QSqlQuery q(m_db.db());
@@ -773,7 +773,7 @@ QVariantList SchoolApp::academicPeriods() const
 
 bool SchoolApp::addAcademicPeriod(const QVariantMap &v)
 {
-    if (!allowed({"administrateur"})) return false;
+    if (!can("periods.manage")) return false;
     const QString name = v.value("name").toString().trimmed();
     const QDate start = QDate::fromString(v.value("startDate").toString().trimmed(), "yyyy-MM-dd");
     const QDate end = QDate::fromString(v.value("endDate").toString().trimmed(), "yyyy-MM-dd");
@@ -794,7 +794,7 @@ bool SchoolApp::addAcademicPeriod(const QVariantMap &v)
 
 bool SchoolApp::setActiveAcademicPeriod(int id)
 {
-    if (!allowed({"administrateur"})) return false;
+    if (!can("periods.manage")) return false;
     QSqlDatabase db = m_db.db();
     if (!db.transaction()) return false;
     QSqlQuery off(db);
@@ -812,7 +812,7 @@ bool SchoolApp::setActiveAcademicPeriod(int id)
 QVariantList SchoolApp::auditLogs(int limit) const
 {
     QVariantList out;
-    if (!allowed({"administrateur"})) return out;
+    if (!can("audit.view")) return out;
     QSqlQuery q(m_db.db());
     q.prepare("SELECT a.created_at,COALESCE(u.name,'Système'),a.action,a.entity,a.entity_id,a.details "
               "FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id ORDER BY a.id DESC LIMIT ?");
@@ -848,7 +848,7 @@ QVariantList SchoolApp::classTuitions() const
 
 bool SchoolApp::setClassTuition(const QString &className, double monthlyAmount)
 {
-    if (!allowed({"administrateur", "comptable"})) return false;
+    if (!can("fees.tuition")) return false;
     if (!classes().contains(className) || monthlyAmount < 0) {
         emit errorOccurred(QStringLiteral("Classe inconnue ou montant négatif."));
         return false;
@@ -867,7 +867,7 @@ bool SchoolApp::setClassTuition(const QString &className, double monthlyAmount)
 QVariantMap SchoolApp::balanceOverview(const QString &fromDate, const QString &toDate) const
 {
     QVariantMap out;
-    if (!allowed({"administrateur", "comptable"})) return out;
+    if (!can("balances.view")) return out;
     const QString from = fromDate.trimmed().isEmpty() ? QStringLiteral("0000-01-01") : fromDate.trimmed();
     const QString to = toDate.trimmed().isEmpty() ? QStringLiteral("9999-12-31") : toDate.trimmed();
 
@@ -914,4 +914,63 @@ QVariantMap SchoolApp::balanceOverview(const QString &fromDate, const QString &t
     }
     out["students"] = rows;
     return out;
+}
+
+bool SchoolApp::can(const QString &permission) const
+{
+    if (m_userId <= 0) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT allowed FROM role_permissions WHERE role=? AND permission=?");
+    q.addBindValue(m_role);
+    q.addBindValue(permission);
+    return q.exec() && q.next() && q.value(0).toInt() == 1;
+}
+
+QVariantList SchoolApp::permissionMatrix() const
+{
+    QVariantList out;
+    if (!can("roles.manage")) return out;
+    QSqlQuery cat(m_db.db());
+    if (!cat.exec("SELECT key,label,grp FROM permissions_catalog ORDER BY grp,label")) return out;
+    while (cat.next()) {
+        QVariantMap row;
+        row["key"] = cat.value(0).toString();
+        row["label"] = cat.value(1).toString();
+        row["group"] = cat.value(2).toString();
+        QVariantMap roles;
+        QSqlQuery r(m_db.db());
+        r.prepare("SELECT role,allowed FROM role_permissions WHERE permission=?");
+        r.addBindValue(row["key"].toString());
+        if (r.exec()) {
+            while (r.next()) roles[r.value(0).toString()] = r.value(1).toInt() == 1;
+        }
+        row["roles"] = roles;
+        out << row;
+    }
+    return out;
+}
+
+bool SchoolApp::setPermission(const QString &role, const QString &permission, bool allowedValue)
+{
+    if (!can("roles.manage")) return false;
+    if (!roles().contains(role)) {
+        emit errorOccurred(QStringLiteral("Rôle inconnu."));
+        return false;
+    }
+    if (role == QLatin1String("administrateur") && permission == QLatin1String("roles.manage") && !allowedValue) {
+        emit errorOccurred(QStringLiteral("L'administrateur doit toujours pouvoir gérer les rôles et les permissions."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE role_permissions SET allowed=? WHERE role=? AND permission=?");
+    q.addBindValue(allowedValue ? 1 : 0);
+    q.addBindValue(role);
+    q.addBindValue(permission);
+    if (!q.exec() || q.numRowsAffected() != 1) {
+        emit errorOccurred(QStringLiteral("Droit inconnu."));
+        return false;
+    }
+    audit("update", "permission", 0, role + " " + permission + (allowedValue ? " = oui" : " = non"));
+    emit dataChanged();
+    return true;
 }
