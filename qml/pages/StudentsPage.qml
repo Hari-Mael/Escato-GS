@@ -9,6 +9,16 @@ Item {
     property string selectedClass: ""
     property string searchText: ""
     property var rows: []
+    property int statusIndex: 0
+
+    function matchesStatus(s) {
+        var graduated = !!s.graduatedAt
+        var active = (s.accountStatus || "active") === "active"
+        if (statusIndex === 1) return !graduated && active
+        if (statusIndex === 2) return !graduated && !active
+        if (statusIndex === 3) return graduated
+        return true
+    }
 
     Component.onCompleted: refresh()
     Connections { target: school; function onDataChanged() { refresh() } }
@@ -28,6 +38,11 @@ Item {
             Layout.fillWidth: true
             AppTextField { Layout.fillWidth: true; placeholderText: "Rechercher nom, prénom ou matricule"; onTextChanged: { searchText=text; refresh() } }
             ComboBox { model: ["Toutes les classes"].concat(school.classes()); onCurrentTextChanged: { selectedClass=currentIndex===0?"":currentText; refresh() } }
+            ComboBox {
+                Layout.preferredWidth: 170
+                model: ["Tous les statuts", "Actifs", "Bloqués", "Diplômés"]
+                onCurrentIndexChanged: { statusIndex = currentIndex; refresh() }
+            }
             AppButton { text: "Actualiser"; onClicked: refresh() }
         }
 
@@ -61,5 +76,5 @@ Item {
         }
     }
 
-    function refresh() { rows = school.students(selectedClass, searchText) }
+    function refresh() { rows = school.students(selectedClass, searchText).filter(matchesStatus) }
 }
