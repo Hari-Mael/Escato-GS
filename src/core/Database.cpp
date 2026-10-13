@@ -206,6 +206,24 @@ bool Database::createSchema()
             PRIMARY KEY(role, permission)
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS fee_types(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            default_amount REAL NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS one_time_fees(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            fee_type_id INTEGER NOT NULL REFERENCES fee_types(id),
+            amount REAL NOT NULL,
+            due_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            payment_id INTEGER REFERENCES payments(id) ON DELETE SET NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -470,6 +488,15 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO fee_types(name,default_amount) VALUES ('Frais d''inscription',0),('Uniforme',0),('Frais d''examen',0),('Carte scolaire',0)"))
+        return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES ('fees.onetime.manage','Gérer les types de frais ponctuels et les assigner','Finances')"))
+        return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES ('fees.onetime.pay','Encaisser les frais ponctuels','Finances')"))
+        return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','fees.onetime.manage',1),('enseignant','fees.onetime.manage',0),('eleve','fees.onetime.manage',0),('parent','fees.onetime.manage',0),('comptable','fees.onetime.manage',1),('administrateur','fees.onetime.pay',1),('enseignant','fees.onetime.pay',0),('eleve','fees.onetime.pay',0),('parent','fees.onetime.pay',0),('comptable','fees.onetime.pay',1)"))
+        return false;
+
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.view','Voir les élèves et leurs fiches','Élèves')")) return false;
     if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','students.view',1),('enseignant','students.view',1),('eleve','students.view',0),('parent','students.view',0),('comptable','students.view',1)")) return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.create','Inscrire un élève','Élèves')")) return false;

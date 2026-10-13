@@ -8,6 +8,7 @@ Item {
     property var tuitions: []
     property var overview: ({})
     property var studentRows: []
+    property var feeTypes: []
     property bool canEdit: school.currentRole === "administrateur" || school.currentRole === "comptable"
 
     function fmt(n) {
@@ -20,10 +21,13 @@ Item {
         overview = school.balanceOverview(fromDate.text, toDate.text)
         studentRows = overview.students || []
     }
-    Component.onCompleted: { refreshTuitions(); refreshOverview() }
+    function refreshFeeTypes() {
+        feeTypes = school.feeTypes()
+    }
+    Component.onCompleted: { refreshTuitions(); refreshOverview(); refreshFeeTypes() }
     Connections {
         target: school
-        function onDataChanged() { root.refreshTuitions(); root.refreshOverview() }
+        function onDataChanged() { root.refreshTuitions(); root.refreshOverview(); root.refreshFeeTypes() }
     }
 
     ScrollView {
@@ -74,6 +78,79 @@ Item {
                                 onClicked: school.setClassTuition(modelData.className, parseFloat(tuitionAmount.text.replace(",", ".")) || 0)
                             }
                             Label { text: root.fmt(modelData.monthlyAmount); color: "#667085"; Layout.fillWidth: true }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                radius: 12
+                color: "white"
+                border.color: "#E5EAEE"
+                implicitHeight: oneTimeColumn.implicitHeight + 40
+
+                ColumnLayout {
+                    id: oneTimeColumn
+                    x: 20; y: 20
+                    width: parent.width - 40
+                    spacing: 10
+
+                    Label { text: "Frais ponctuels"; font.pixelSize: 18; font.bold: true }
+                    Label {
+                        text: "Inscription, uniforme, examen, carte scolaire… Un type de frais peut être assigné à toute une classe."
+                        color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                    }
+
+                    Repeater {
+                        model: root.feeTypes
+                        delegate: RowLayout {
+                            Layout.fillWidth: true
+                            Label { text: modelData.name; Layout.fillWidth: true }
+                            Label { text: root.fmt(modelData.amount); color: "#667085" }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: root.canEdit
+                        spacing: 8
+                        AppTextField { id: newFeeName; placeholderText: "Nouveau type (ex. Frais d'inscription)"; Layout.fillWidth: true }
+                        AppTextField { id: newFeeAmount; placeholderText: "Montant par défaut"; Layout.preferredWidth: 170; inputMethodHints: Qt.ImhDigitsOnly }
+                        AppButton {
+                            text: "Ajouter le type"
+                            highlighted: true
+                            onClicked: {
+                                if (school.addFeeType({name: newFeeName.text, amount: parseFloat(newFeeAmount.text.replace(",", ".")) || 0})) {
+                                    newFeeName.text = ""; newFeeAmount.text = ""
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        visible: root.canEdit
+                        spacing: 8
+                        ComboBox {
+                            id: assignType
+                            Layout.preferredWidth: 220
+                            model: root.feeTypes
+                            textRole: "name"
+                            valueRole: "id"
+                        }
+                        ComboBox {
+                            id: assignClass
+                            Layout.preferredWidth: 130
+                            model: school.classes()
+                        }
+                        AppTextField { id: assignAmount; placeholderText: "Montant (Ar)"; Layout.preferredWidth: 140; inputMethodHints: Qt.ImhDigitsOnly }
+                        AppTextField { id: assignDue; placeholderText: "Échéance AAAA-MM-JJ"; Layout.preferredWidth: 170 }
+                        AppButton {
+                            text: "Assigner à la classe"
+                            highlighted: true
+                            onClicked: school.assignOneTimeFeeToClass(assignType.currentValue, assignClass.currentText,
+                                                                      parseFloat(assignAmount.text.replace(",", ".")) || 0, assignDue.text)
                         }
                     }
                 }

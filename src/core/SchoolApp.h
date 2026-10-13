@@ -137,6 +137,12 @@ public:
     Q_INVOKABLE QVariantList permissionMatrix() const;
     Q_INVOKABLE bool setPermission(const QString &role, const QString &permission, bool allowedValue);
 
+    Q_INVOKABLE QVariantList feeTypes() const;
+    Q_INVOKABLE bool addFeeType(const QVariantMap &v);
+    Q_INVOKABLE bool assignOneTimeFeeToClass(int feeTypeId, const QString &className, double amount, const QString &dueDate);
+    Q_INVOKABLE QVariantList studentOneTimeFees(int studentId) const;
+    Q_INVOKABLE int payOneTimeFee(int feeId, const QString &method, const QString &reference);
+
     Q_INVOKABLE QVariantList classTuitions() const;
     Q_INVOKABLE bool setClassTuition(const QString &className, double monthlyAmount);
     Q_INVOKABLE QVariantMap balanceOverview(const QString &fromDate, const QString &toDate) const;
@@ -156,6 +162,7 @@ private:
     bool canViewStudent(int studentId) const;
 
     bool allowed(const QStringList &roles) const;
+    double oneTimeBilled(int studentId, const QString &from, const QString &to) const;
     void audit(const QString &action, const QString &entity, int entityId, const QString &details = QString());
     bool execute(const QString &sql, const QVariantList &bind = {});
 };

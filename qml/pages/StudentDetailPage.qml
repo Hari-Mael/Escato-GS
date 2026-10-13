@@ -11,6 +11,7 @@ Item {
     property var guardianRows: []
     property var parentRows: []
     property var paymentRows: []
+    property var oneTimeRows: []
 
     function fmt(n) {
         return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " Ar"
@@ -20,6 +21,7 @@ Item {
         guardianRows = school.guardians(studentId)
         parentRows = school.parentLinks(studentId)
         paymentRows = school.payments(studentId)
+        oneTimeRows = school.studentOneTimeFees(studentId)
     }
     onStudentIdChanged: refresh()
     Component.onCompleted: refresh()
@@ -166,6 +168,59 @@ Item {
                         AppButton{
                             text:"Lier le compte"; highlighted:true
                             onClicked: { if (school.linkParentByEmail(studentId, parentEmail.text)) parentEmail.text = "" }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                radius: 16
+                color: "white"
+                implicitHeight: oneTimeColumn.implicitHeight + 40
+
+                ColumnLayout {
+                    id: oneTimeColumn
+                    x: 20; y: 20
+                    width: parent.width - 40
+                    spacing: 10
+
+                    Label{text:"Frais ponctuels";font.pixelSize:20;font.bold:true;color:"#0B2A43"}
+                    Label {
+                        visible: oneTimeRows.length === 0
+                        text: "Aucun frais ponctuel assigné à cet élève."
+                        color: "#667085"
+                    }
+                    Repeater {
+                        model: oneTimeRows
+                        delegate: RowLayout {
+                            Layout.fillWidth: true
+                            Label{text:modelData.name; Layout.fillWidth: true}
+                            Label{text:"échéance " + modelData.dueDate; color:"#667085"}
+                            Label{text:fmt(modelData.amount); font.bold:true}
+                            ComboBox {
+                                id: feeMethod
+                                visible: modelData.status === "pending"
+                                model: school.paymentMethods()
+                                Layout.preferredWidth: 150
+                            }
+                            AppButton {
+                                visible: modelData.status === "pending"
+                                text: "Encaisser"
+                                highlighted: true
+                                onClicked: school.payOneTimeFee(modelData.id, feeMethod.currentText, "")
+                            }
+                            Label {
+                                visible: modelData.status === "paid"
+                                text: "Payé"
+                                color: "#0F9D8F"
+                                font.bold: true
+                            }
+                            AppButton {
+                                visible: modelData.status === "paid"
+                                text: "🧾 Reçu"
+                                onClicked: printer.printReceipt(modelData.paymentId)
+                            }
                         }
                     }
                 }
