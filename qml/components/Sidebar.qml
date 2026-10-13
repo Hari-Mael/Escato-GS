@@ -34,7 +34,8 @@ Rectangle {
                 ["accounting", "Comptabilité", "🧾"],
                 ["communication", "Messages / annonces", "💬"],
                 ["accounts", "Comptes / sécurité", "🔐"],
-                ["bulletin", "Bulletins", "📄"]
+                ["bulletin", "Bulletins", "📄"],
+                ["audit", "Journal d'audit", "📜"]
             ]
             delegate: AppButton {
                 Layout.fillWidth: true

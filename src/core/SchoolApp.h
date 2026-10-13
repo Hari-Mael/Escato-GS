@@ -125,6 +125,13 @@ public:
 
     Q_INVOKABLE QVariantList dashboard() const;
     Q_INVOKABLE QVariantMap monthlyStats() const;
+
+    Q_INVOKABLE QString setting(const QString &key) const;
+    Q_INVOKABLE bool setSetting(const QString &key, const QString &value);
+    Q_INVOKABLE QVariantList academicPeriods() const;
+    Q_INVOKABLE bool addAcademicPeriod(const QVariantMap &v);
+    Q_INVOKABLE bool setActiveAcademicPeriod(int id);
+    Q_INVOKABLE QVariantList auditLogs(int limit) const;
     Q_INVOKABLE bool resetPassword(int userId, const QString &newPassword);
 
 signals:

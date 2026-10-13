@@ -175,6 +175,19 @@ bool Database::createSchema()
             UNIQUE(parent_user_id, student_id)
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS settings(
+            key TEXT PRIMARY KEY,
+            value TEXT
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS academic_periods(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 0
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -439,6 +452,10 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO settings(key,value) VALUES('school_name','Ecole Sacré-Cœur'),"
+              "('school_city','Tolagnaro'),('signatory_title','Le Frère Directeur')"))
+        return false;
+
     const QStringList accounts = {
         "411000|Parents / familles|client",
         "401000|Fournisseurs|supplier",

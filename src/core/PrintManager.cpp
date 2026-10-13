@@ -38,6 +38,16 @@ struct Page
     }
 };
 
+QString settingText(const QString &key, const QString &fallback)
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT value FROM settings WHERE key=?");
+    q.addBindValue(key);
+    if (q.exec() && q.next() && !q.value(0).toString().trimmed().isEmpty())
+        return q.value(0).toString();
+    return fallback;
+}
+
 // En-tête officiel utilisé par les documents administratifs imprimés par ESCATO.
 // Le logo fourni par l'établissement est embarqué dans l'exécutable sous :/assets/logo.png.
 double drawOfficialHeader(Page &pg, const QString &documentTitle)
@@ -53,7 +63,7 @@ double drawOfficialHeader(Page &pg, const QString &documentTitle)
 
     p.setPen(Qt::black);
     p.setFont(QFont("Arial", 13, QFont::Bold));
-    pg.text(left + 95, top + 12, "Ecole Sacré-Cœur");
+    pg.text(left + 95, top + 12, settingText("school_name", "Ecole Sacré-Cœur"));
 
     p.setFont(QFont("Arial", 9));
     pg.text(left + 95, top + 27, "Anosy");
@@ -282,7 +292,7 @@ bool drawStudentCard(Page &pg, int studentId)
 
     p.setPen(Qt::white);
     p.setFont(QFont("Arial", 12, QFont::Bold));
-    pg.text(x + 16, y + 24, QStringLiteral("ESCATO GS"));
+    pg.text(x + 16, y + 24, settingText("school_name", "Ecole Sacré-Cœur"));
     p.setFont(QFont("Arial", 9));
     pg.text(x + 16, y + 42, QStringLiteral("CARTE ÉLÈVE  •  ") + academicYear);
 
@@ -393,7 +403,7 @@ bool drawReceipt(Page &pg, int paymentId)
 
     p.setPen(QColor("#0F9D8F"));
     p.setFont(QFont("Arial", 16, QFont::Bold));
-    pg.text(90, 58, QStringLiteral("ESCATO GS"));
+    pg.text(90, 58, settingText("school_name", "Ecole Sacré-Cœur"));
     p.setPen(QColor("#667085"));
     p.setFont(QFont("Arial", 11));
     pg.text(90, 76, QStringLiteral("Reçu de paiement"));
@@ -444,7 +454,7 @@ bool drawReceipt(Page &pg, int paymentId)
     const double sigY = 455;
     p.setPen(QColor("#0B2A43"));
     p.setFont(QFont("Arial", 10, QFont::Bold));
-    pg.text(270, sigY, QStringLiteral("Le comptable"));
+    pg.text(270, sigY, settingText("signatory_title", "Le Frère Directeur"));
     p.setPen(QPen(QColor("#667085"), 0.8));
     p.drawLine(QPoint(pg.px(262), pg.px(sigY + 60)), QPoint(pg.px(390), pg.px(sigY + 60)));
     p.setPen(QColor("#667085"));
@@ -509,7 +519,7 @@ bool drawPaymentRequest(Page &pg, int studentId)
 
     const double sigY = y + 90;
     p.setFont(QFont("Arial", 10, QFont::Bold));
-    pg.text(370, sigY, QStringLiteral("Le comptable"));
+    pg.text(370, sigY, settingText("signatory_title", "Le Frère Directeur"));
     p.setPen(QPen(QColor("#667085"), 0.8));
     p.drawLine(QPoint(pg.px(360), pg.px(sigY + 60)), QPoint(pg.px(550), pg.px(sigY + 60)));
     return true;
@@ -562,7 +572,7 @@ bool drawAttestation(Page &pg, int studentId, const QString &kind)
     p.setPen(QColor("#0B2A43"));
     p.setFont(QFont("Arial", 11));
     pg.text(45, y, QStringLiteral("Année scolaire ") + academicYear); y += 34;
-    pg.text(45, y, QStringLiteral("Le Frère Directeur de l'établissement certifie que :")); y += 30;
+    pg.text(45, y, settingText("signatory_title", "Le Frère Directeur") + QStringLiteral(" de l'établissement certifie que :")); y += 30;
     pg.text(45, y, QStringLiteral("Nom et prénoms : ") + lastName.toUpper() + " " + firstName); y += 22;
     pg.text(45, y, QStringLiteral("Né(e) le : ") + birthDate
             + (birthPlace.isEmpty() ? QString() : QStringLiteral(" à ") + birthPlace)); y += 22;
@@ -599,10 +609,10 @@ bool drawAttestation(Page &pg, int studentId, const QString &kind)
         pg.text(45, y, line); y += 18;
     }
     y += 24;
-    pg.text(45, y, QStringLiteral("Fait à Tolagnaro, le ") + today.toString(QStringLiteral("dd/MM/yyyy")));
+    pg.text(45, y, QStringLiteral("Fait à ") + settingText("school_city", "Tolagnaro") + QStringLiteral(", le ") + today.toString(QStringLiteral("dd/MM/yyyy")));
     y += 60;
     p.setFont(QFont("Arial", 11, QFont::Bold));
-    pg.text(340, y, QStringLiteral("Le Frère Directeur"));
+    pg.text(340, y, settingText("signatory_title", "Le Frère Directeur"));
     p.setPen(QPen(QColor("#667085"), 0.8));
     p.drawLine(QPoint(pg.px(330), pg.px(y + 50)), QPoint(pg.px(550), pg.px(y + 50)));
     return true;
