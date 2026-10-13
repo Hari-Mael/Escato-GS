@@ -43,6 +43,15 @@ public:
     Q_INVOKABLE bool addGuardian(int studentId, const QVariantMap &v);
     Q_INVOKABLE bool removeGuardian(int linkId);
 
+    Q_INVOKABLE QVariantList parentLinks(int studentId) const;
+    Q_INVOKABLE bool linkParentByEmail(int studentId, const QString &email);
+    Q_INVOKABLE bool unlinkParent(int linkId);
+    Q_INVOKABLE QVariantList myStudents() const;
+    Q_INVOKABLE QVariantMap familyStudent(int studentId) const;
+    Q_INVOKABLE QVariantList familyInvoices(int studentId) const;
+    Q_INVOKABLE QVariantList familyPayments(int studentId) const;
+    Q_INVOKABLE QVariantMap familyBulletin(int studentId, const QString &term) const;
+
     Q_INVOKABLE QVariantList students(const QString &className = QString(), const QString &search = QString()) const;
     Q_INVOKABLE QVariantMap student(int id) const;
     Q_INVOKABLE bool addStudent(const QVariantMap &v);
@@ -127,6 +136,8 @@ private:
     int m_userId = 0;
     QString m_userName;
     QString m_role;
+
+    bool canViewStudent(int studentId) const;
 
     bool allowed(const QStringList &roles) const;
     void audit(const QString &action, const QString &entity, int entityId, const QString &details = QString());

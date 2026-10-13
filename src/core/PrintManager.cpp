@@ -14,6 +14,9 @@
 #include <QColor>
 #include <QFont>
 #include <QRectF>
+#include <QLocale>
+#include <QVector>
+#include <QPair>
 #include "third_party/qrcodegen/qrcodegen.hpp"
 
 namespace {
@@ -330,6 +333,188 @@ bool drawStudentCard(Page &pg, int studentId)
     return true;
 }
 
+
+QString methodLabel(const QString &method)
+{
+    if (method == QLatin1String("mvola")) return QStringLiteral("Mvola");
+    if (method == QLatin1String("orange_money")) return QStringLiteral("Orange Money");
+    if (method == QLatin1String("airtel_money")) return QStringLiteral("Airtel Money");
+    if (method == QLatin1String("virement")) return QStringLiteral("Virement bancaire");
+    if (method == QLatin1String("especes")) return QStringLiteral("Espèces");
+    return method;
+}
+
+QString formatAr(double amount)
+{
+    return QLocale(QLocale::French).toString(amount, 'f', 0) + QStringLiteral(" Ar");
+}
+
+void renderSized(QPrinter &printer, QPageSize::PageSizeId size, const std::function<void(Page &)> &draw)
+{
+    printer.setPageSize(QPageSize(size));
+    printer.setFullPage(true);
+    QPainter p(&printer);
+    if (!p.isActive()) return;
+    Page pg(printer, p);
+    draw(pg);
+    p.end();
+}
+
+bool drawReceipt(Page &pg, int paymentId)
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT p.receipt_number,p.amount,p.method,p.reference,p.paid_at,s.matricule,s.last_name,s.first_name,"
+              "s.current_class,COALESCE(u.name,'') FROM payments p JOIN students s ON s.id=p.student_id "
+              "LEFT JOIN users u ON u.id=p.recorded_by WHERE p.id=?");
+    q.addBindValue(paymentId);
+    if (!q.exec() || !q.next()) return false;
+
+    const QString number = q.value(0).toString();
+    const double amount = q.value(1).toDouble();
+    const QString method = methodLabel(q.value(2).toString());
+    const QString reference = q.value(3).toString();
+    const QString paidAt = q.value(4).toString().left(10);
+    const QString matricule = q.value(5).toString();
+    const QString fullName = q.value(6).toString().toUpper() + " " + q.value(7).toString();
+    const QString currentClass = q.value(8).toString();
+    const QString recordedBy = q.value(9).toString();
+
+    QPainter &p = pg.p;
+    const double left = 30, right = 390;
+
+    p.setPen(QPen(QColor("#D5DEE3"), 1.0));
+    p.setBrush(Qt::NoBrush);
+    p.drawRoundedRect(QRectF(pg.px(20), pg.px(20), pg.px(380), pg.px(555)), pg.px(10), pg.px(10));
+
+    const QPixmap logo(":/assets/logo.png");
+    if (!logo.isNull())
+        p.drawPixmap(QRect(pg.px(left), pg.px(35), pg.px(48), pg.px(48)),
+                     logo.scaled(pg.px(48), pg.px(48), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    p.setPen(QColor("#0F9D8F"));
+    p.setFont(QFont("Arial", 16, QFont::Bold));
+    pg.text(90, 58, QStringLiteral("ESCATO GS"));
+    p.setPen(QColor("#667085"));
+    p.setFont(QFont("Arial", 11));
+    pg.text(90, 76, QStringLiteral("Reçu de paiement"));
+
+    p.setPen(QPen(QColor("#0F9D8F"), 1.2));
+    p.setBrush(QColor("#E6F6F4"));
+    p.drawRoundedRect(QRectF(pg.px(262), pg.px(35), pg.px(128), pg.px(42)), pg.px(8), pg.px(8));
+    p.setBrush(Qt::NoBrush);
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 8));
+    pg.text(270, 50, QStringLiteral("N° de reçu"));
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.text(270, 68, number);
+
+    p.setPen(QPen(QColor("#E1E8EF"), 1.0));
+    p.drawLine(QPoint(pg.px(left), pg.px(100)), QPoint(pg.px(right), pg.px(100)));
+
+    const QVector<QPair<QString, QString>> rows = {
+        {QStringLiteral("Élève"), fullName},
+        {QStringLiteral("Matricule"), matricule},
+        {QStringLiteral("Classe"), currentClass},
+        {QStringLiteral("Date de paiement"), paidAt},
+        {QStringLiteral("Mode de paiement"), method},
+        {QStringLiteral("Référence"), reference.isEmpty() ? QStringLiteral("—") : reference},
+        {QStringLiteral("Enregistré par"), recordedBy.isEmpty() ? QStringLiteral("—") : recordedBy}
+    };
+    double y = 125;
+    for (const auto &row : rows) {
+        p.setPen(QColor("#667085"));
+        p.setFont(QFont("Arial", 10));
+        pg.text(left, y, row.first);
+        p.setPen(QColor("#0B2A43"));
+        p.setFont(QFont("Arial", 11, QFont::Bold));
+        pg.cell(165, y, 215, row.second);
+        y += 26;
+    }
+
+    y += 10;
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor("#0F9D8F"));
+    p.drawRoundedRect(QRectF(pg.px(left), pg.px(y), pg.px(360), pg.px(50)), pg.px(10), pg.px(10));
+    p.setPen(Qt::white);
+    p.setFont(QFont("Arial", 10));
+    pg.text(left + 16, y + 19, QStringLiteral("Montant payé"));
+    p.setFont(QFont("Arial", 18, QFont::Bold));
+    pg.text(left + 16, y + 41, formatAr(amount));
+
+    const double sigY = 455;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.text(270, sigY, QStringLiteral("Le comptable"));
+    p.setPen(QPen(QColor("#667085"), 0.8));
+    p.drawLine(QPoint(pg.px(262), pg.px(sigY + 60)), QPoint(pg.px(390), pg.px(sigY + 60)));
+    p.setPen(QColor("#667085"));
+    p.setFont(QFont("Arial", 8));
+    pg.text(270, sigY + 74, QStringLiteral("Signature et cachet"));
+
+    p.setFont(QFont("Arial", 9));
+    pg.text(left, 520, QStringLiteral("Ce reçu fait foi de paiement."));
+    pg.text(left, 534, QStringLiteral("Merci de conserver ce document."));
+    return true;
+}
+
+bool drawPaymentRequest(Page &pg, int studentId)
+{
+    QSqlQuery s(QSqlDatabase::database());
+    s.prepare("SELECT matricule,last_name,first_name,current_class,parent_phone FROM students WHERE id=? AND deleted_at IS NULL");
+    s.addBindValue(studentId);
+    if (!s.exec() || !s.next()) return false;
+
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT period_month,due_date,amount,status FROM invoices WHERE student_id=? ORDER BY due_date");
+    q.addBindValue(studentId);
+    if (!q.exec()) return false;
+
+    double y = drawOfficialHeader(pg, QStringLiteral("DEMANDE DE PAIEMENT"));
+    QPainter &p = pg.p;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 11));
+    pg.text(45, y, QStringLiteral("Élève : ") + s.value(1).toString().toUpper() + " " + s.value(2).toString()); y += 22;
+    pg.text(45, y, QStringLiteral("Matricule : ") + s.value(0).toString()); y += 22;
+    pg.text(45, y, QStringLiteral("Classe : ") + s.value(3).toString()); y += 22;
+    pg.text(45, y, QStringLiteral("Téléphone : ") + s.value(4).toString()); y += 34;
+
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.text(45, y, QStringLiteral("Mois")); pg.text(190, y, QStringLiteral("Échéance"));
+    pg.text(340, y, QStringLiteral("Montant")); pg.text(470, y, QStringLiteral("Statut"));
+    y += 8;
+    p.setPen(QPen(QColor("#D5DEE3"), 0.8));
+    p.drawLine(QPoint(pg.px(45), pg.px(y)), QPoint(pg.px(550), pg.px(y)));
+    y += 18;
+
+    double due = 0;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 10));
+    while (q.next()) {
+        const QString status = q.value(3).toString();
+        const double amount = q.value(2).toDouble();
+        if (status != QLatin1String("paid")) due += amount;
+        pg.cell(45, y, 130, q.value(0).toString());
+        pg.cell(190, y, 130, q.value(1).toString());
+        pg.cell(340, y, 120, formatAr(amount));
+        pg.cell(470, y, 90, status == QLatin1String("paid") ? QStringLiteral("Payé")
+                           : status == QLatin1String("late") ? QStringLiteral("En retard")
+                           : QStringLiteral("À payer"));
+        y += 20;
+    }
+
+    y += 10;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 13, QFont::Bold));
+    pg.text(45, y, QStringLiteral("Total restant dû : ") + formatAr(due));
+
+    const double sigY = y + 90;
+    p.setFont(QFont("Arial", 10, QFont::Bold));
+    pg.text(370, sigY, QStringLiteral("Le comptable"));
+    p.setPen(QPen(QColor("#667085"), 0.8));
+    p.drawLine(QPoint(pg.px(360), pg.px(sigY + 60)), QPoint(pg.px(550), pg.px(sigY + 60)));
+    return true;
+}
+
 bool PrintManager::printStudentCertificate(int studentId)
 {
     QPrinter printer(QPrinter::HighResolution);
@@ -369,5 +554,47 @@ bool PrintManager::exportStudentCardPdf(const QString &path, int studentId)
     printer.setOutputFileName(path);
     bool ok = false;
     render(printer, [&](Page &pg) { ok = drawStudentCard(pg, studentId); });
+    return ok;
+}
+
+bool PrintManager::printReceipt(int paymentId)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dlg(&printer);
+    if (dlg.exec() != QDialog::Accepted) return false;
+    bool ok = false;
+    renderSized(printer, QPageSize::A5, [&](Page &pg) { ok = drawReceipt(pg, paymentId); });
+    return ok;
+}
+
+bool PrintManager::exportReceiptPdf(const QString &path, int paymentId)
+{
+    if (path.isEmpty()) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    bool ok = false;
+    renderSized(printer, QPageSize::A5, [&](Page &pg) { ok = drawReceipt(pg, paymentId); });
+    return ok;
+}
+
+bool PrintManager::printPaymentRequest(int studentId)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dlg(&printer);
+    if (dlg.exec() != QDialog::Accepted) return false;
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawPaymentRequest(pg, studentId); });
+    return ok;
+}
+
+bool PrintManager::exportPaymentRequestPdf(const QString &path, int studentId)
+{
+    if (path.isEmpty()) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawPaymentRequest(pg, studentId); });
     return ok;
 }
