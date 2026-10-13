@@ -10,6 +10,24 @@ Rectangle {
     property string currentPage: "dashboard"
     signal navigate(string page)
 
+    property var perms: ({})
+    function refreshPerms() {
+        perms = {
+            "audit": school.can("audit.view"),
+            "fees": school.can("balances.view"),
+            "roles": school.can("roles.manage")
+        }
+    }
+    function pageAllowed(p) {
+        return p in perms ? perms[p] : true
+    }
+    Component.onCompleted: refreshPerms()
+    Connections {
+        target: school
+        function onDataChanged() { root.refreshPerms() }
+        function onSessionChanged() { root.refreshPerms() }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -42,6 +60,7 @@ Rectangle {
             delegate: AppButton {
                 Layout.fillWidth: true
                 text: modelData[2] + "  " + modelData[1]
+                visible: root.pageAllowed(modelData[0])
                 highlighted: root.currentPage === modelData[0]
                 onClicked: root.navigate(modelData[0])
             }

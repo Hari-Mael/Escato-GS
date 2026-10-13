@@ -12,11 +12,27 @@ Item {
     property var parentRows: []
     property var paymentRows: []
     property var oneTimeRows: []
+    property bool canDelete: false
+    property bool canBlock: false
+    property bool canGuardAdd: false
+    property bool canGuardRemove: false
+    property bool canParents: false
+    property bool canPay: false
+
+    function refreshPerms() {
+        canDelete = school.can("students.delete")
+        canBlock = school.can("students.block")
+        canGuardAdd = school.can("guardians.add")
+        canGuardRemove = school.can("guardians.remove")
+        canParents = school.can("parents.link")
+        canPay = school.can("fees.onetime.pay")
+    }
 
     function fmt(n) {
         return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " Ar"
     }
     function refresh() {
+        refreshPerms()
         info = school.student(studentId)
         guardianRows = school.guardians(studentId)
         parentRows = school.parentLinks(studentId)
@@ -82,9 +98,9 @@ Item {
                     Label{text:"Statut du compte : "+info.accountStatus}
                     Row {
                         spacing: 8
-                        AppButton{text:"Diplômé";onClicked:school.graduateStudent(studentId)}
-                        AppButton{text:"Bloquer";onClicked:school.blockStudent(studentId,"Blocage administratif")}
-                        AppButton{text:"Débloquer";onClicked:school.unblockStudent(studentId)}
+                        AppButton{text:"Diplômé";visible:root.canDelete;onClicked:school.graduateStudent(studentId)}
+                        AppButton{text:"Bloquer";visible:root.canBlock;onClicked:school.blockStudent(studentId,"Blocage administratif")}
+                        AppButton{text:"Débloquer";visible:root.canBlock;onClicked:school.unblockStudent(studentId)}
                     }
                 }
             }
@@ -111,10 +127,11 @@ Item {
                                 Layout.fillWidth: true; elide: Text.ElideRight
                             }
                             Label{text:modelData.phone; color:"#667085"}
-                            AppButton{text:"Retirer"; onClicked: school.removeGuardian(modelData.linkId)}
+                            AppButton{text:"Retirer"; visible: root.canGuardRemove; onClicked: school.removeGuardian(modelData.linkId)}
                         }
                     }
                     RowLayout {
+                        visible: root.canGuardAdd
                         Layout.fillWidth: true
                         spacing: 8
                         AppTextField{id:gName; placeholderText:"Nom complet"; Layout.fillWidth:true}
@@ -158,10 +175,11 @@ Item {
                                 text: modelData.name + " — " + modelData.email
                                 Layout.fillWidth: true; elide: Text.ElideRight
                             }
-                            AppButton{text:"Retirer l'accès"; onClicked: school.unlinkParent(modelData.linkId)}
+                            AppButton{text:"Retirer l'accès"; visible: root.canParents; onClicked: school.unlinkParent(modelData.linkId)}
                         }
                     }
                     RowLayout {
+                        visible: root.canParents
                         Layout.fillWidth: true
                         spacing: 8
                         AppTextField{id:parentEmail; placeholderText:"E-mail du compte parent"; Layout.fillWidth:true}
@@ -200,12 +218,12 @@ Item {
                             Label{text:fmt(modelData.amount); font.bold:true}
                             ComboBox {
                                 id: feeMethod
-                                visible: modelData.status === "pending"
+                                visible: root.canPay && modelData.status === "pending"
                                 model: school.paymentMethods()
                                 Layout.preferredWidth: 150
                             }
                             AppButton {
-                                visible: modelData.status === "pending"
+                                visible: root.canPay && modelData.status === "pending"
                                 text: "Encaisser"
                                 highlighted: true
                                 onClicked: school.payOneTimeFee(modelData.id, feeMethod.currentText, "")

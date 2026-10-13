@@ -6,7 +6,13 @@ import "../components"
 Item {
     id: root
     property var periods: []
-    property bool isAdmin: school.currentRole === "administrateur"
+    property bool canSettings: false
+    property bool canPeriods: false
+
+    function refreshPerms() {
+        canSettings = school.can("settings.manage")
+        canPeriods = school.can("periods.manage")
+    }
 
     function refreshPeriods() {
         periods = school.academicPeriods()
@@ -15,9 +21,14 @@ Item {
         schoolName.text = school.setting("school_name")
         schoolCity.text = school.setting("school_city")
         signatory.text = school.setting("signatory_title")
+        refreshPerms()
         refreshPeriods()
     }
-    Connections { target: school; function onDataChanged() { root.refreshPeriods() } }
+    Connections {
+        target: school
+        function onDataChanged() { root.refreshPerms(); root.refreshPeriods() }
+        function onSessionChanged() { root.refreshPerms() }
+    }
 
     ScrollView {
         id: scroll
@@ -65,13 +76,13 @@ Item {
                         text: "Ces informations apparaissent sur les reçus, attestations, certificats et demandes de paiement."
                         color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true
                     }
-                    AppTextField { id: schoolName; Layout.fillWidth: true; placeholderText: "Nom de l'établissement"; enabled: root.isAdmin }
-                    AppTextField { id: schoolCity; Layout.fillWidth: true; placeholderText: "Ville (ex. Tolagnaro)"; enabled: root.isAdmin }
-                    AppTextField { id: signatory; Layout.fillWidth: true; placeholderText: "Titre du signataire (ex. Le Frère Directeur)"; enabled: root.isAdmin }
+                    AppTextField { id: schoolName; Layout.fillWidth: true; placeholderText: "Nom de l'établissement"; enabled: root.canSettings }
+                    AppTextField { id: schoolCity; Layout.fillWidth: true; placeholderText: "Ville (ex. Tolagnaro)"; enabled: root.canSettings }
+                    AppTextField { id: signatory; Layout.fillWidth: true; placeholderText: "Titre du signataire (ex. Le Frère Directeur)"; enabled: root.canSettings }
                     AppButton {
                         text: "Enregistrer"
                         highlighted: true
-                        visible: root.isAdmin
+                        visible: root.canSettings
                         onClicked: {
                             school.setSetting("school_name", schoolName.text)
                             school.setSetting("school_city", schoolCity.text)
@@ -107,14 +118,14 @@ Item {
                             Label { text: modelData.isActive ? "Active" : ""; color: "#0F9D8F"; font.bold: true }
                             AppButton {
                                 text: "Activer"
-                                visible: root.isAdmin && !modelData.isActive
+                                visible: root.canPeriods && !modelData.isActive
                                 onClicked: school.setActiveAcademicPeriod(modelData.id)
                             }
                         }
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        visible: root.isAdmin
+                        visible: root.canPeriods
                         spacing: 8
                         AppTextField { id: periodName; placeholderText: "Ex. 2026 – 2027"; Layout.fillWidth: true }
                         AppTextField { id: periodStart; placeholderText: "Début AAAA-MM-JJ"; Layout.preferredWidth: 170 }
