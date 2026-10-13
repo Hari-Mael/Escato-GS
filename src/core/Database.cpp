@@ -151,6 +151,23 @@ bool Database::createSchema()
             deleted_at TEXT
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS guardians(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            email TEXT,
+            relation TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS student_guardians(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            guardian_id INTEGER NOT NULL REFERENCES guardians(id) ON DELETE CASCADE,
+            is_primary INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(student_id, guardian_id)
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,

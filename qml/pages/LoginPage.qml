@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 Rectangle {
     color: "#EEF4F8"
@@ -21,10 +22,10 @@ Rectangle {
             Label { text: "ESCATO"; font.pixelSize: 30; font.bold: true; color: "#0B2A43"; Layout.alignment: Qt.AlignHCenter }
             Label { text: "Accédez à votre espace de travail"; color: "#667085"; Layout.alignment: Qt.AlignHCenter }
 
-            TextField { id: email; Layout.fillWidth: true; placeholderText: "Adresse e-mail" }
-            TextField { id: password; Layout.fillWidth: true; placeholderText: "Mot de passe"; echoMode: TextInput.Password; onAccepted: doLogin() }
+            AppTextField { id: email; Layout.fillWidth: true; placeholderText: "Adresse e-mail" }
+            AppTextField { id: password; Layout.fillWidth: true; placeholderText: "Mot de passe"; echoMode: TextInput.Password; onAccepted: doLogin() }
 
-            Button {
+            AppButton {
                 Layout.fillWidth: true
                 text: "Se connecter"
                 highlighted: true

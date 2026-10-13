@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QMessageBox>
 #include <QQmlApplicationEngine>
+#include <QQuickStyle>
 #include <QQmlContext>
 #include <QTextStream>
 #include <QUrl>
@@ -26,6 +27,7 @@ int main(int argc, char *argv[])
     qInstallMessageHandler(journaliserMessage);
 
     QApplication app(argc, argv);
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication::setOrganizationName("ESCATO");
     QApplication::setApplicationName("ESCATO");
     QApplication::setApplicationVersion("1.0.0");

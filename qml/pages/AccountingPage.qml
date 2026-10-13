@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 Item {
     property var dash: ({})
@@ -23,7 +24,7 @@ Item {
             Layout.fillWidth: true
             Label { text: "Comptabilité"; font.pixelSize: 28; font.bold: true }
             Item { Layout.fillWidth: true }
-            Button { text: "Actualiser"; onClicked: refresh() }
+            AppButton { text: "Actualiser"; onClicked: refresh() }
         }
 
         RowLayout {
@@ -65,12 +66,12 @@ Item {
             Item {
                 ColumnLayout { anchors.fill: parent; spacing: 10
                     RowLayout { Layout.fillWidth: true
-                        TextField { id: cat; placeholderText: "Catégorie"; Layout.preferredWidth: 150 }
-                        TextField { id: desc; placeholderText: "Description"; Layout.fillWidth: true }
-                        TextField { id: amount; placeholderText: "Montant"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 120 }
+                        AppTextField { id: cat; placeholderText: "Catégorie"; Layout.preferredWidth: 150 }
+                        AppTextField { id: desc; placeholderText: "Description"; Layout.fillWidth: true }
+                        AppTextField { id: amount; placeholderText: "Montant"; inputMethodHints: Qt.ImhDigitsOnly; Layout.preferredWidth: 120 }
                         ComboBox { id: method; model: ["especes","virement","mvola","orange_money","airtel_money"] }
                         ComboBox { id: acct; model: expenseAccounts; textRole: "label"; Layout.preferredWidth: 220 }
-                        Button { text: "Enregistrer"; onClicked: { var a = Number(amount.text.replace(',', '.')); if (!cat.text || !desc.text || !(a > 0)) { messageOk = false; message = 'Catégorie, description et montant (> 0) sont obligatoires.'; return } if (school.addExpense({date: Qt.formatDate(new Date(), 'yyyy-MM-dd'), category: cat.text, description: desc.text, amount: a, method: method.currentText, accountCode: acct.currentIndex >= 0 ? expenseAccounts[acct.currentIndex].code : '606000'})) { cat.text=''; desc.text=''; amount.text=''; messageOk = true; message='Dépense enregistrée' } else { messageOk = false; message = 'Échec de l\'enregistrement de la dépense.' } } }
+                        AppButton { text: "Enregistrer"; onClicked: { var a = Number(amount.text.replace(',', '.')); if (!cat.text || !desc.text || !(a > 0)) { messageOk = false; message = 'Catégorie, description et montant (> 0) sont obligatoires.'; return } if (school.addExpense({date: Qt.formatDate(new Date(), 'yyyy-MM-dd'), category: cat.text, description: desc.text, amount: a, method: method.currentText, accountCode: acct.currentIndex >= 0 ? expenseAccounts[acct.currentIndex].code : '606000'})) { cat.text=''; desc.text=''; amount.text=''; messageOk = true; message='Dépense enregistrée' } else { messageOk = false; message = 'Échec de l\'enregistrement de la dépense.' } } }
                     }
                     Label { text: message; color: messageOk ? "#2E7D32" : "#C62828" }
                     ListView { Layout.fillWidth: true; Layout.fillHeight: true; model: expensesModel; clip: true
@@ -102,12 +103,12 @@ Item {
                     Label { text: "Exports compatibles avec Microsoft Excel et formats d'échange comptable"; font.pixelSize: 18; font.bold: true }
                     Label { text: "Les exports sont enregistrés dans : " + school.accountingExportDirectory(); wrapMode: Text.Wrap; Layout.fillWidth: true; color: "#637381" }
                     Flow { Layout.fillWidth: true; spacing: 10
-                        Button { text: "Paiements → Excel (CSV)"; onClicked: exportKind("payments") }
-                        Button { text: "Dépenses → Excel (CSV)"; onClicked: exportKind("expenses") }
-                        Button { text: "Journal → Excel (CSV)"; onClicked: exportKind("journal") }
-                        Button { text: "Balance → Excel (CSV)"; onClicked: exportKind("trial_balance") }
-                        Button { text: "Export Sage 100 (CSV)"; onClicked: exportKind("sage100") }
-                        Button { text: "Export Odoo (CSV)"; onClicked: exportKind("odoo") }
+                        AppButton { text: "Paiements → Excel (CSV)"; onClicked: exportKind("payments") }
+                        AppButton { text: "Dépenses → Excel (CSV)"; onClicked: exportKind("expenses") }
+                        AppButton { text: "Journal → Excel (CSV)"; onClicked: exportKind("journal") }
+                        AppButton { text: "Balance → Excel (CSV)"; onClicked: exportKind("trial_balance") }
+                        AppButton { text: "Export Sage 100 (CSV)"; onClicked: exportKind("sage100") }
+                        AppButton { text: "Export Odoo (CSV)"; onClicked: exportKind("odoo") }
                     }
                     Label { text: message; color: messageOk ? "#2E7D32" : "#C62828"; wrapMode: Text.Wrap; Layout.fillWidth: true }
                     Label { text: "Remarque : les formats Sage 100 et Odoo sont des exports structurés à mapper/importer selon la version et le paramétrage du logiciel comptable."; color: "#637381"; wrapMode: Text.Wrap; Layout.fillWidth: true }

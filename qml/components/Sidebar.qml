@@ -16,7 +16,7 @@ Rectangle {
         spacing: 6
 
         Label {
-            text: "ESCATO"
+            text: "ESCATO GS"
             color: "white"
             font.pixelSize: 22
             font.bold: true
@@ -36,7 +36,7 @@ Rectangle {
                 ["accounts", "Comptes / sécurité", "🔐"],
                 ["bulletin", "Bulletins", "📄"]
             ]
-            delegate: Button {
+            delegate: AppButton {
                 Layout.fillWidth: true
                 text: modelData[2] + "  " + modelData[1]
                 highlighted: root.currentPage === modelData[0]
@@ -69,7 +69,7 @@ Rectangle {
             Layout.fillWidth: true
         }
 
-        Button {
+        AppButton {
             Layout.fillWidth: true
             Layout.topMargin: 6
             text: "⚙  Paramètres"
@@ -77,7 +77,7 @@ Rectangle {
             onClicked: root.navigate("settings")
         }
 
-        Button {
+        AppButton {
             Layout.fillWidth: true
             text: "⎋  Déconnexion"
             onClicked: school.logout()

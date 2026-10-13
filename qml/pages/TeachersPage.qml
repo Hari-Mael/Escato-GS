@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 Item {
     signal createRequested()
     property var rows: []
@@ -9,8 +10,8 @@ Item {
     Connections{target:school;function onDataChanged(){refresh()}}
     ColumnLayout{
         anchors.fill:parent;spacing:15
-        RowLayout{Layout.fillWidth:true;Label{text:"Enseignants";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}Button{text:"➕ Ajouter";onClicked:createRequested()}Button{text:"🖨 Imprimer";onClicked:printer.printTeacherList()}}
-        TextField{Layout.fillWidth:true;placeholderText:"Rechercher enseignant, matière, CIN...";onTextChanged:searchText=text;onEditingFinished:refresh()}
+        RowLayout{Layout.fillWidth:true;Label{text:"Enseignants";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}AppButton{text:"➕ Ajouter";onClicked:createRequested()}AppButton{text:"🖨 Imprimer";onClicked:printer.printTeacherList()}}
+        AppTextField{Layout.fillWidth:true;placeholderText:"Rechercher enseignant, matière, CIN...";onTextChanged:searchText=text;onEditingFinished:refresh()}
         ListView{
             Layout.fillWidth:true;Layout.fillHeight:true;model:rows;clip:true
             delegate:Rectangle{width:parent.width;height:65;color:index%2?"#FAFBFC":"white"

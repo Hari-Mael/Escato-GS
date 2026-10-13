@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "../components"
 
 // Affiché uniquement tant qu'aucun administrateur n'existe (premier lancement).
 Rectangle {
@@ -18,19 +19,19 @@ Rectangle {
             anchors.margins: 38
             spacing: 14
 
-            Label { text: "ESCATO"; font.pixelSize: 30; font.bold: true; color: "#0B2A43"; Layout.alignment: Qt.AlignHCenter }
+            Label { text: "ESCATO GS"; font.pixelSize: 30; font.bold: true; color: "#0B2A43"; Layout.alignment: Qt.AlignHCenter }
             Label { text: "Première configuration"; font.pixelSize: 18; font.bold: true; Layout.alignment: Qt.AlignHCenter }
             Label {
                 text: "Créez le compte administrateur. Il aura le contrôle complet de l'application et pourra ensuite créer tous les autres comptes."
                 color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true
             }
 
-            TextField { id: fullName; Layout.fillWidth: true; placeholderText: "Nom complet" }
-            TextField { id: adminEmail; Layout.fillWidth: true; placeholderText: "Adresse e-mail"; inputMethodHints: Qt.ImhEmailCharactersOnly }
-            TextField { id: pwd; Layout.fillWidth: true; placeholderText: "Mot de passe (8 caractères minimum)"; echoMode: TextInput.Password }
-            TextField { id: pwd2; Layout.fillWidth: true; placeholderText: "Confirmer le mot de passe"; echoMode: TextInput.Password; onAccepted: submit() }
+            AppTextField { id: fullName; Layout.fillWidth: true; placeholderText: "Nom complet" }
+            AppTextField { id: adminEmail; Layout.fillWidth: true; placeholderText: "Adresse e-mail"; inputMethodHints: Qt.ImhEmailCharactersOnly }
+            AppTextField { id: pwd; Layout.fillWidth: true; placeholderText: "Mot de passe (8 caractères minimum)"; echoMode: TextInput.Password }
+            AppTextField { id: pwd2; Layout.fillWidth: true; placeholderText: "Confirmer le mot de passe"; echoMode: TextInput.Password; onAccepted: submit() }
 
-            Button {
+            AppButton {
                 Layout.fillWidth: true
                 text: "Créer le compte administrateur"
                 highlighted: true

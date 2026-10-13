@@ -55,7 +55,7 @@ ApplicationWindow {
                     RowLayout {
                         Layout.fillWidth: true
 
-                        Button {
+                        AppButton {
                             text: "☰"
                             font.pixelSize: 18
                             implicitWidth: 44

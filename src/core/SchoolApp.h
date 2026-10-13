@@ -39,6 +39,10 @@ public:
     Q_INVOKABLE QStringList paymentMethods() const;
     Q_INVOKABLE QStringList terms() const;
 
+    Q_INVOKABLE QVariantList guardians(int studentId) const;
+    Q_INVOKABLE bool addGuardian(int studentId, const QVariantMap &v);
+    Q_INVOKABLE bool removeGuardian(int linkId);
+
     Q_INVOKABLE QVariantList students(const QString &className = QString(), const QString &search = QString()) const;
     Q_INVOKABLE QVariantMap student(int id) const;
     Q_INVOKABLE bool addStudent(const QVariantMap &v);
