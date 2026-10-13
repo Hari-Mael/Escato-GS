@@ -355,7 +355,7 @@ bool SchoolApp::generateMonthlyInvoices(const QString &month)
 {
     if(!allowed({"administrateur","comptable"}))return false;
     QSqlQuery s(m_db.db());s.exec("SELECT id FROM students WHERE graduated_at IS NULL AND deleted_at IS NULL");
-    while(s.next()){QSqlQuery f(m_db.db());f.prepare("SELECT monthly_amount FROM student_fees WHERE student_id=? ORDER BY id DESC LIMIT 1");f.addBindValue(s.value(0));if(f.exec()&&f.next()){QDate d=QDate::fromString(month+"-01","yyyy-MM-dd");if(!d.isValid())continue;QSqlQuery i(m_db.db());i.prepare("INSERT OR IGNORE INTO invoices(student_id,period_month,due_date,amount,status) VALUES(?,?,?,?, 'pending')");i.addBindValue(s.value(0));i.addBindValue(d.toString("yyyy-MM-dd"));i.addBindValue(d.addDays(9).toString("yyyy-MM-dd"));i.addBindValue(f.value(0));i.exec();}}
+    while(s.next()){QSqlQuery f(m_db.db());f.prepare("SELECT COALESCE((SELECT monthly_amount FROM student_fees WHERE student_id=? ORDER BY id DESC LIMIT 1),(SELECT ct.monthly_amount FROM class_tuitions ct JOIN students st ON st.current_class=ct.class_name WHERE st.id=? AND ct.monthly_amount>0))");f.addBindValue(s.value(0));f.addBindValue(s.value(0));if(f.exec()&&f.next()&&!f.value(0).isNull()){QDate d=QDate::fromString(month+"-01","yyyy-MM-dd");if(!d.isValid())continue;QSqlQuery i(m_db.db());i.prepare("INSERT OR IGNORE INTO invoices(student_id,period_month,due_date,amount,status) VALUES(?,?,?,?, 'pending')");i.addBindValue(s.value(0));i.addBindValue(d.toString("yyyy-MM-dd"));i.addBindValue(d.addDays(9).toString("yyyy-MM-dd"));i.addBindValue(f.value(0));i.exec();}}
     emit dataChanged();return true;
 }
 bool SchoolApp::processPaymentReminders()
@@ -828,5 +828,90 @@ QVariantList SchoolApp::auditLogs(int limit) const
         m["details"] = q.value(5).toString();
         out << m;
     }
+    return out;
+}
+
+QVariantList SchoolApp::classTuitions() const
+{
+    QVariantList out;
+    for (const QString &c : classes()) {
+        QSqlQuery q(m_db.db());
+        q.prepare("SELECT monthly_amount FROM class_tuitions WHERE class_name=?");
+        q.addBindValue(c);
+        QVariantMap m;
+        m["className"] = c;
+        m["monthlyAmount"] = q.exec() && q.next() ? q.value(0).toDouble() : 0.0;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::setClassTuition(const QString &className, double monthlyAmount)
+{
+    if (!allowed({"administrateur", "comptable"})) return false;
+    if (!classes().contains(className) || monthlyAmount < 0) {
+        emit errorOccurred(QStringLiteral("Classe inconnue ou montant négatif."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO class_tuitions(class_name,monthly_amount) VALUES(?,?) "
+              "ON CONFLICT(class_name) DO UPDATE SET monthly_amount=excluded.monthly_amount");
+    q.addBindValue(className);
+    q.addBindValue(monthlyAmount);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("update", "class_tuition", 0, className);
+    emit dataChanged();
+    return true;
+}
+
+QVariantMap SchoolApp::balanceOverview(const QString &fromDate, const QString &toDate) const
+{
+    QVariantMap out;
+    if (!allowed({"administrateur", "comptable"})) return out;
+    const QString from = fromDate.trimmed().isEmpty() ? QStringLiteral("0000-01-01") : fromDate.trimmed();
+    const QString to = toDate.trimmed().isEmpty() ? QStringLiteral("9999-12-31") : toDate.trimmed();
+
+    QSqlQuery b(m_db.db());
+    b.prepare("SELECT COALESCE(SUM(amount),0), COALESCE(SUM(CASE WHEN status='late' THEN 1 ELSE 0 END),0) "
+              "FROM invoices WHERE due_date BETWEEN ? AND ?");
+    b.addBindValue(from); b.addBindValue(to);
+    double billed = 0;
+    if (b.exec() && b.next()) {
+        billed = b.value(0).toDouble();
+        out["lateCount"] = b.value(1).toInt();
+    }
+
+    QSqlQuery p(m_db.db());
+    p.prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE substr(paid_at,1,10) BETWEEN ? AND ?");
+    p.addBindValue(from); p.addBindValue(to);
+    double collected = 0;
+    if (p.exec() && p.next()) collected = p.value(0).toDouble();
+
+    out["billed"] = billed;
+    out["collected"] = collected;
+    out["balance"] = billed - collected;
+
+    QVariantList rows;
+    QSqlQuery s(m_db.db());
+    s.prepare("SELECT s.id, s.last_name || ' ' || s.first_name, s.current_class, "
+              "COALESCE((SELECT SUM(i.amount) FROM invoices i WHERE i.student_id=s.id AND i.due_date BETWEEN ? AND ?),0), "
+              "COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.student_id=s.id AND substr(p.paid_at,1,10) BETWEEN ? AND ?),0) "
+              "FROM students s WHERE s.deleted_at IS NULL AND s.graduated_at IS NULL ORDER BY s.current_class, s.last_name");
+    for (int i = 0; i < 2; ++i) { s.addBindValue(from); s.addBindValue(to); }
+    if (s.exec()) {
+        while (s.next()) {
+            QVariantMap m;
+            const double sBilled = s.value(3).toDouble();
+            const double sCollected = s.value(4).toDouble();
+            m["studentId"] = s.value(0).toInt();
+            m["name"] = s.value(1).toString();
+            m["className"] = s.value(2).toString();
+            m["billed"] = sBilled;
+            m["collected"] = sCollected;
+            m["balance"] = sBilled - sCollected;
+            rows << m;
+        }
+    }
+    out["students"] = rows;
     return out;
 }

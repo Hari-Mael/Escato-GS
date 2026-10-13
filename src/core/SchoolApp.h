@@ -132,6 +132,10 @@ public:
     Q_INVOKABLE bool addAcademicPeriod(const QVariantMap &v);
     Q_INVOKABLE bool setActiveAcademicPeriod(int id);
     Q_INVOKABLE QVariantList auditLogs(int limit) const;
+
+    Q_INVOKABLE QVariantList classTuitions() const;
+    Q_INVOKABLE bool setClassTuition(const QString &className, double monthlyAmount);
+    Q_INVOKABLE QVariantMap balanceOverview(const QString &fromDate, const QString &toDate) const;
     Q_INVOKABLE bool resetPassword(int userId, const QString &newPassword);
 
 signals:
