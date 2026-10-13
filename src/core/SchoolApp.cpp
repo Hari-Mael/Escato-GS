@@ -125,7 +125,7 @@ QStringList SchoolApp::classes() const
             "4ème 1","4ème 2","4ème 3","3ème 1","3ème 2","3ème 3",
             "2nde 1","2nde 2","2nde 3","2nde 4",
             "1ère L1","1ère L2","1ère S1","1ère S2",
-            "Terminale L1","Terminale L2","Terminale S"};
+            "TL1","TL2","TS"};
 }
 QStringList SchoolApp::roles() const { return {"administrateur","enseignant","eleve","parent","comptable"}; }
 QStringList SchoolApp::paymentMethods() const { return {"mvola","orange_money","airtel_money","virement","especes"}; }
@@ -178,7 +178,7 @@ bool SchoolApp::addStudent(const QVariantMap &v)
     QSqlDatabase db=m_db.db(); db.transaction();
     QSqlQuery q(db);
     QString matricule=v.value("matricule").toString().trimmed();
-    if(matricule.isEmpty()) matricule="ELV-"+QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz");
+    if(matricule.isEmpty()) matricule="ELV-"+QDateTime::currentDateTime().toString("yyyyMMddhhmmsszzz")+"-"+QUuid::createUuid().toString(QUuid::Id128).left(4).toUpper();
     q.prepare(R"(INSERT INTO students(matricule,last_name,first_name,birth_date,birth_place,father_name,father_job,mother_name,mother_job,parent_phone,parent_email,address,previous_school,previous_class,current_class,desired_career,photo,entry_date) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?))");
     QStringList k={"lastName","firstName","birthDate","birthPlace","fatherName","fatherJob","motherName","motherJob","parentPhone","parentEmail","address","previousSchool","previousClass","className","desiredCareer","photo","entryDate"};
     q.addBindValue(matricule); for(auto &x:k) q.addBindValue(v.value(x));
@@ -705,4 +705,28 @@ QVariantMap SchoolApp::familyBulletin(int studentId, const QString &term) const
 {
     if (!canViewStudent(studentId)) return {};
     return bulletin(studentId, term);
+}
+
+QVariantMap SchoolApp::monthlyStats() const
+{
+    QVariantMap m;
+    QSqlQuery p(m_db.db());
+    if (p.exec("SELECT COALESCE(SUM(amount),0), COUNT(*) FROM payments "
+               "WHERE strftime('%Y-%m', paid_at)=strftime('%Y-%m','now','localtime')") && p.next()) {
+        m["paidAmount"] = p.value(0).toDouble();
+        m["paidCount"] = p.value(1).toInt();
+    }
+    QSqlQuery late(m_db.db());
+    if (late.exec("SELECT COUNT(*), COALESCE(SUM(amount),0) FROM invoices WHERE status='late'") && late.next()) {
+        m["lateCount"] = late.value(0).toInt();
+        m["lateAmount"] = late.value(1).toDouble();
+    }
+    QSqlQuery due(m_db.db());
+    if (due.exec("SELECT COALESCE(SUM(amount),0) FROM invoices WHERE status IN ('pending','late')") && due.next())
+        m["dueAmount"] = due.value(0).toDouble();
+    QSqlQuery tard(m_db.db());
+    if (tard.exec("SELECT COUNT(*) FROM tardiness_records "
+                  "WHERE strftime('%Y-%m', occurred_at)=strftime('%Y-%m','now','localtime')") && tard.next())
+        m["tardinessCount"] = tard.value(0).toInt();
+    return m;
 }

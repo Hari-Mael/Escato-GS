@@ -515,6 +515,99 @@ bool drawPaymentRequest(Page &pg, int studentId)
     return true;
 }
 
+
+QStringList wrapText(Page &pg, const QString &text, double widthPt)
+{
+    QStringList lines;
+    const QFontMetrics fm(pg.p.font(), pg.p.device());
+    const int maxWidth = pg.px(widthPt);
+    QString current;
+    for (const QString &word : text.split(' ', Qt::SkipEmptyParts)) {
+        const QString candidate = current.isEmpty() ? word : current + QLatin1Char(' ') + word;
+        if (!current.isEmpty() && fm.horizontalAdvance(candidate) > maxWidth) {
+            lines << current;
+            current = word;
+        } else {
+            current = candidate;
+        }
+    }
+    if (!current.isEmpty()) lines << current;
+    return lines;
+}
+
+bool drawAttestation(Page &pg, int studentId, const QString &kind)
+{
+    QSqlQuery q(QSqlDatabase::database());
+    q.prepare("SELECT last_name,first_name,birth_date,birth_place,current_class,matricule FROM students WHERE id=? AND deleted_at IS NULL");
+    q.addBindValue(studentId);
+    if (!q.exec() || !q.next()) return false;
+
+    const QString lastName = q.value(0).toString();
+    const QString firstName = q.value(1).toString();
+    const QString birthDate = q.value(2).toString();
+    const QString birthPlace = q.value(3).toString();
+    const QString currentClass = q.value(4).toString();
+    const QString matricule = q.value(5).toString();
+
+    const QDate today = QDate::currentDate();
+    const int startYear = today.month() >= 9 ? today.year() : today.year() - 1;
+    const QString academicYear = QString("%1 – %2").arg(startYear).arg(startYear + 1);
+
+    QString title = QStringLiteral("ATTESTATION D'INSCRIPTION");
+    if (kind == QLatin1String("frequentation")) title = QStringLiteral("ATTESTATION DE FRÉQUENTATION");
+    else if (kind == QLatin1String("reussite")) title = QStringLiteral("ATTESTATION DE RÉUSSITE");
+
+    double y = drawOfficialHeader(pg, title);
+    QPainter &p = pg.p;
+    p.setPen(QColor("#0B2A43"));
+    p.setFont(QFont("Arial", 11));
+    pg.text(45, y, QStringLiteral("Année scolaire ") + academicYear); y += 34;
+    pg.text(45, y, QStringLiteral("Le Frère Directeur de l'établissement certifie que :")); y += 30;
+    pg.text(45, y, QStringLiteral("Nom et prénoms : ") + lastName.toUpper() + " " + firstName); y += 22;
+    pg.text(45, y, QStringLiteral("Né(e) le : ") + birthDate
+            + (birthPlace.isEmpty() ? QString() : QStringLiteral(" à ") + birthPlace)); y += 22;
+    pg.text(45, y, QStringLiteral("Matricule : ") + matricule); y += 34;
+
+    QString body = QStringLiteral("est régulièrement inscrit(e) en classe de ") + currentClass
+                 + QStringLiteral(" pour l'année scolaire ") + academicYear + QStringLiteral(".");
+
+    if (kind == QLatin1String("frequentation")) {
+        QSqlQuery t(QSqlDatabase::database());
+        t.prepare("SELECT COUNT(*) FROM tardiness_records WHERE student_id=? AND occurred_at >= ?");
+        t.addBindValue(studentId);
+        t.addBindValue(QStringLiteral("%1-09-01").arg(startYear));
+        const int late = t.exec() && t.next() ? t.value(0).toInt() : 0;
+        body += QStringLiteral(" Il/Elle fréquente l'établissement de façon régulière. Retards enregistrés depuis la rentrée : ")
+              + QString::number(late) + QStringLiteral(".");
+    } else if (kind == QLatin1String("reussite")) {
+        QSqlQuery g(QSqlDatabase::database());
+        g.prepare("SELECT AVG(g.score*20.0/e.max_score), COUNT(*) FROM grades g JOIN exams e ON e.id=g.exam_id "
+                  "WHERE g.student_id=? AND g.score IS NOT NULL AND e.max_score>0");
+        g.addBindValue(studentId);
+        if (g.exec() && g.next() && g.value(1).toInt() > 0) {
+            body = QStringLiteral("a obtenu une moyenne générale de ") + QString::number(g.value(0).toDouble(), 'f', 2)
+                 + QStringLiteral("/20 sur l'ensemble des évaluations enregistrées pour l'année scolaire ") + academicYear + QStringLiteral(".");
+        } else {
+            body = QStringLiteral("n'a encore aucune évaluation enregistrée pour l'année scolaire ") + academicYear + QStringLiteral(".");
+        }
+    }
+
+    p.setFont(QFont("Arial", 11));
+    for (const QString &line : wrapText(pg, body, 500)) { pg.text(45, y, line); y += 18; }
+    y += 16;
+    for (const QString &line : wrapText(pg, QStringLiteral("La présente attestation est délivrée à l'intéressé(e) pour servir et valoir ce que de droit."), 500)) {
+        pg.text(45, y, line); y += 18;
+    }
+    y += 24;
+    pg.text(45, y, QStringLiteral("Fait à Tolagnaro, le ") + today.toString(QStringLiteral("dd/MM/yyyy")));
+    y += 60;
+    p.setFont(QFont("Arial", 11, QFont::Bold));
+    pg.text(340, y, QStringLiteral("Le Frère Directeur"));
+    p.setPen(QPen(QColor("#667085"), 0.8));
+    p.drawLine(QPoint(pg.px(330), pg.px(y + 50)), QPoint(pg.px(550), pg.px(y + 50)));
+    return true;
+}
+
 bool PrintManager::printStudentCertificate(int studentId)
 {
     QPrinter printer(QPrinter::HighResolution);
@@ -596,5 +689,26 @@ bool PrintManager::exportPaymentRequestPdf(const QString &path, int studentId)
     printer.setOutputFileName(path);
     bool ok = false;
     render(printer, [&](Page &pg) { ok = drawPaymentRequest(pg, studentId); });
+    return ok;
+}
+
+bool PrintManager::printAttestation(int studentId, const QString &kind)
+{
+    QPrinter printer(QPrinter::HighResolution);
+    QPrintDialog dlg(&printer);
+    if (dlg.exec() != QDialog::Accepted) return false;
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawAttestation(pg, studentId, kind); });
+    return ok;
+}
+
+bool PrintManager::exportAttestationPdf(const QString &path, int studentId, const QString &kind)
+{
+    if (path.isEmpty()) return false;
+    QPrinter printer(QPrinter::HighResolution);
+    printer.setOutputFormat(QPrinter::PdfFormat);
+    printer.setOutputFileName(path);
+    bool ok = false;
+    render(printer, [&](Page &pg) { ok = drawAttestation(pg, studentId, kind); });
     return ok;
 }

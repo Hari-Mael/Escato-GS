@@ -17,4 +17,6 @@ public:
     Q_INVOKABLE bool exportReceiptPdf(const QString &path, int paymentId);
     Q_INVOKABLE bool printPaymentRequest(int studentId);
     Q_INVOKABLE bool exportPaymentRequestPdf(const QString &path, int studentId);
+    Q_INVOKABLE bool printAttestation(int studentId, const QString &kind);
+    Q_INVOKABLE bool exportAttestationPdf(const QString &path, int studentId, const QString &kind);
 };

@@ -45,6 +45,16 @@ Item {
                 AppButton { text: "🧾 Demande de paiement"; onClicked: printer.printPaymentRequest(studentId) }
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Label { text: "Attestations :"; color: "#667085" }
+                AppButton { text: "Inscription"; onClicked: printer.printAttestation(studentId, "inscription") }
+                AppButton { text: "Fréquentation"; onClicked: printer.printAttestation(studentId, "frequentation") }
+                AppButton { text: "Réussite"; onClicked: printer.printAttestation(studentId, "reussite") }
+                Item { Layout.fillWidth: true }
+            }
+
             Rectangle {
                 Layout.fillWidth: true
                 radius: 16
