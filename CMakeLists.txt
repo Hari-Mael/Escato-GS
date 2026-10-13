@@ -58,6 +58,7 @@ qt_add_qml_module(escato_app
         qml/pages/FamilyPortal.qml
         qml/pages/AuditPage.qml
         qml/pages/FeesPage.qml
+        qml/pages/RolesPage.qml
 )
 
 qt_add_resources(escato_app "escato_resources"

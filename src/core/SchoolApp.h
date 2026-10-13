@@ -133,6 +133,10 @@ public:
     Q_INVOKABLE bool setActiveAcademicPeriod(int id);
     Q_INVOKABLE QVariantList auditLogs(int limit) const;
 
+    Q_INVOKABLE bool can(const QString &permission) const;
+    Q_INVOKABLE QVariantList permissionMatrix() const;
+    Q_INVOKABLE bool setPermission(const QString &role, const QString &permission, bool allowedValue);
+
     Q_INVOKABLE QVariantList classTuitions() const;
     Q_INVOKABLE bool setClassTuition(const QString &className, double monthlyAmount);
     Q_INVOKABLE QVariantMap balanceOverview(const QString &fromDate, const QString &toDate) const;

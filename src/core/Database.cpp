@@ -193,6 +193,19 @@ bool Database::createSchema()
             monthly_amount REAL NOT NULL DEFAULT 0
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS permissions_catalog(
+            key TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            grp TEXT NOT NULL
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS role_permissions(
+            role TEXT NOT NULL,
+            permission TEXT NOT NULL,
+            allowed INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(role, permission)
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -457,6 +470,67 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.view','Voir les élèves et leurs fiches','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','students.view',1),('enseignant','students.view',1),('eleve','students.view',0),('parent','students.view',0),('comptable','students.view',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.create','Inscrire un élève','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','students.create',1),('enseignant','students.create',1),('eleve','students.create',0),('parent','students.create',0),('comptable','students.create',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.edit','Modifier une fiche élève','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','students.edit',1),('enseignant','students.edit',1),('eleve','students.edit',0),('parent','students.edit',0),('comptable','students.edit',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.block','Bloquer ou débloquer un élève','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','students.block',1),('enseignant','students.block',1),('eleve','students.block',0),('parent','students.block',0),('comptable','students.block',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('students.delete','Supprimer un élève ou le marquer diplômé','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','students.delete',1),('enseignant','students.delete',0),('eleve','students.delete',0),('parent','students.delete',0),('comptable','students.delete',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('guardians.read','Voir les parents et tuteurs','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','guardians.read',1),('enseignant','guardians.read',1),('eleve','guardians.read',0),('parent','guardians.read',0),('comptable','guardians.read',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('guardians.add','Ajouter un tuteur','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','guardians.add',1),('enseignant','guardians.add',1),('eleve','guardians.add',0),('parent','guardians.add',0),('comptable','guardians.add',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('guardians.remove','Retirer un tuteur','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','guardians.remove',1),('enseignant','guardians.remove',0),('eleve','guardians.remove',0),('parent','guardians.remove',0),('comptable','guardians.remove',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('parents.link','Lier un compte parent à un élève','Élèves')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','parents.link',1),('enseignant','parents.link',0),('eleve','parents.link',0),('parent','parents.link',0),('comptable','parents.link',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('teachers.manage','Gérer les enseignants','Personnel')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','teachers.manage',1),('enseignant','teachers.manage',0),('eleve','teachers.manage',0),('parent','teachers.manage',0),('comptable','teachers.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('courses.manage','Gérer les cours et ressources','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','courses.manage',1),('enseignant','courses.manage',1),('eleve','courses.manage',0),('parent','courses.manage',0),('comptable','courses.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('exams.manage','Gérer les examens','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','exams.manage',1),('enseignant','exams.manage',1),('eleve','exams.manage',0),('parent','exams.manage',0),('comptable','exams.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('grades.edit','Saisir les notes','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','grades.edit',1),('enseignant','grades.edit',1),('eleve','grades.edit',0),('parent','grades.edit',0),('comptable','grades.edit',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('tardiness.record','Enregistrer les retards','Vie scolaire')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','tardiness.record',1),('enseignant','tardiness.record',1),('eleve','tardiness.record',0),('parent','tardiness.record',0),('comptable','tardiness.record',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('payments.create','Enregistrer un paiement','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','payments.create',1),('enseignant','payments.create',0),('eleve','payments.create',0),('parent','payments.create',0),('comptable','payments.create',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('fees.student','Définir le tarif individuel d''un élève','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','fees.student',1),('enseignant','fees.student',0),('eleve','fees.student',0),('parent','fees.student',0),('comptable','fees.student',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('fees.tuition','Modifier la grille tarifaire par classe','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','fees.tuition',1),('enseignant','fees.tuition',0),('eleve','fees.tuition',0),('parent','fees.tuition',0),('comptable','fees.tuition',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('invoices.generate','Générer les factures mensuelles','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','invoices.generate',1),('enseignant','invoices.generate',0),('eleve','invoices.generate',0),('parent','invoices.generate',0),('comptable','invoices.generate',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('invoices.remind','Lancer les relances de paiement','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','invoices.remind',1),('enseignant','invoices.remind',0),('eleve','invoices.remind',0),('parent','invoices.remind',0),('comptable','invoices.remind',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('balances.view','Voir la vue d''ensemble des soldes','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','balances.view',1),('enseignant','balances.view',0),('eleve','balances.view',0),('parent','balances.view',0),('comptable','balances.view',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('accounting.write','Saisir les écritures et les dépenses','Comptabilité')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','accounting.write',1),('enseignant','accounting.write',0),('eleve','accounting.write',0),('parent','accounting.write',0),('comptable','accounting.write',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('accounting.export','Exporter la comptabilité','Comptabilité')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','accounting.export',1),('enseignant','accounting.export',0),('eleve','accounting.export',0),('parent','accounting.export',0),('comptable','accounting.export',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('communication.announcements','Publier et supprimer des annonces','Communication')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','communication.announcements',1),('enseignant','communication.announcements',0),('eleve','communication.announcements',0),('parent','communication.announcements',0),('comptable','communication.announcements',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('users.manage','Créer des comptes, changer un rôle, réinitialiser un mot de passe','Comptes')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','users.manage',1),('enseignant','users.manage',0),('eleve','users.manage',0),('parent','users.manage',0),('comptable','users.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('users.block','Bloquer un compte','Comptes')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','users.block',1),('enseignant','users.block',1),('eleve','users.block',0),('parent','users.block',0),('comptable','users.block',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('users.unblock','Débloquer un compte','Comptes')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','users.unblock',1),('enseignant','users.unblock',0),('eleve','users.unblock',0),('parent','users.unblock',0),('comptable','users.unblock',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('periods.manage','Gérer les périodes académiques et d''examen','Administration')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','periods.manage',1),('enseignant','periods.manage',0),('eleve','periods.manage',0),('parent','periods.manage',0),('comptable','periods.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('settings.manage','Modifier les paramètres de l''établissement','Administration')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','settings.manage',1),('enseignant','settings.manage',0),('eleve','settings.manage',0),('parent','settings.manage',0),('comptable','settings.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('audit.view','Consulter le journal d''audit','Administration')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','audit.view',1),('enseignant','audit.view',0),('eleve','audit.view',0),('parent','audit.view',0),('comptable','audit.view',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('roles.manage','Gérer les rôles et les permissions','Administration')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','roles.manage',1),('enseignant','roles.manage',0),('eleve','roles.manage',0),('parent','roles.manage',0),('comptable','roles.manage',0)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO settings(key,value) VALUES('school_name','Ecole Sacré-Cœur'),"
               "('school_city','Tolagnaro'),('signatory_title','Le Frère Directeur')"))
         return false;
