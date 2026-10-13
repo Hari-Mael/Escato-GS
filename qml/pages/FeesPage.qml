@@ -9,7 +9,13 @@ Item {
     property var overview: ({})
     property var studentRows: []
     property var feeTypes: []
-    property bool canEdit: school.currentRole === "administrateur" || school.currentRole === "comptable"
+    property bool canTuition: false
+    property bool canOneTime: false
+
+    function refreshPerms() {
+        canTuition = school.can("fees.tuition")
+        canOneTime = school.can("fees.onetime.manage")
+    }
 
     function fmt(n) {
         return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " Ar"
@@ -24,10 +30,11 @@ Item {
     function refreshFeeTypes() {
         feeTypes = school.feeTypes()
     }
-    Component.onCompleted: { refreshTuitions(); refreshOverview(); refreshFeeTypes() }
+    Component.onCompleted: { refreshPerms(); refreshTuitions(); refreshOverview(); refreshFeeTypes() }
     Connections {
         target: school
-        function onDataChanged() { root.refreshTuitions(); root.refreshOverview(); root.refreshFeeTypes() }
+        function onDataChanged() { root.refreshPerms(); root.refreshTuitions(); root.refreshOverview(); root.refreshFeeTypes() }
+        function onSessionChanged() { root.refreshPerms() }
     }
 
     ScrollView {
@@ -69,12 +76,12 @@ Item {
                                 id: tuitionAmount
                                 text: String(Math.round(modelData.monthlyAmount))
                                 Layout.preferredWidth: 160
-                                enabled: root.canEdit
+                                enabled: root.canTuition
                                 inputMethodHints: Qt.ImhDigitsOnly
                             }
                             AppButton {
                                 text: "Enregistrer"
-                                visible: root.canEdit
+                                visible: root.canTuition
                                 onClicked: school.setClassTuition(modelData.className, parseFloat(tuitionAmount.text.replace(",", ".")) || 0)
                             }
                             Label { text: root.fmt(modelData.monthlyAmount); color: "#667085"; Layout.fillWidth: true }
@@ -113,7 +120,7 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        visible: root.canEdit
+                        visible: root.canOneTime
                         spacing: 8
                         AppTextField { id: newFeeName; placeholderText: "Nouveau type (ex. Frais d'inscription)"; Layout.fillWidth: true }
                         AppTextField { id: newFeeAmount; placeholderText: "Montant par défaut"; Layout.preferredWidth: 170; inputMethodHints: Qt.ImhDigitsOnly }
@@ -130,7 +137,7 @@ Item {
 
                     RowLayout {
                         Layout.fillWidth: true
-                        visible: root.canEdit
+                        visible: root.canOneTime
                         spacing: 8
                         ComboBox {
                             id: assignType
