@@ -124,6 +124,7 @@ public:
     Q_INVOKABLE bool toggleExamPeriod(int id);
 
     Q_INVOKABLE QVariantList dashboard() const;
+    Q_INVOKABLE QVariantMap monthlyStats() const;
     Q_INVOKABLE bool resetPassword(int userId, const QString &newPassword);
 
 signals:

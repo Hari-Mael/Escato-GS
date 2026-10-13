@@ -5,9 +5,22 @@ import ESCATO
 import "../components"
 
 ScrollView {
+    id: root
     clip: true
+
+    property var stats: ({})
+
+    function fmt(n) {
+        return Math.round(Number(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " Ar"
+    }
+    function refresh() {
+        stats = school.monthlyStats()
+    }
+    Component.onCompleted: refresh()
+    Connections { target: school; function onDataChanged() { root.refresh() } }
+
     ColumnLayout {
-        width: parent.width
+        width: root.availableWidth
         spacing: 22
 
         Label { text: "Tableau de bord"; font.pixelSize: 30; font.bold: true }
@@ -19,6 +32,14 @@ ScrollView {
             StatCard { title: "Enseignants"; value: school.teacherCount }
             StatCard { title: "Cours"; value: school.courseCount }
             StatCard { title: "Factures en attente"; value: school.pendingInvoiceCount }
+        }
+
+        RowLayout {
+            spacing: 15
+            StatCard { title: "Paiements ce mois"; value: root.fmt(root.stats.paidAmount || 0) }
+            StatCard { title: "Factures en retard"; value: String(root.stats.lateCount || 0) }
+            StatCard { title: "Reste à recouvrer"; value: root.fmt(root.stats.dueAmount || 0) }
+            StatCard { title: "Retards ce mois"; value: String(root.stats.tardinessCount || 0) }
         }
 
         Rectangle {

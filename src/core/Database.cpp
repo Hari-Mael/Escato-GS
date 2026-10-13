@@ -417,6 +417,10 @@ bool Database::migrate()
               "WHERE receipt_number IS NULL"))
         return false;
 
+    if (!exec("UPDATE students SET current_class='TL1' WHERE current_class IN ('T L1','Terminale L1')")) return false;
+    if (!exec("UPDATE students SET current_class='TL2' WHERE current_class IN ('T L2','Terminale L2')")) return false;
+    if (!exec("UPDATE students SET current_class='TS' WHERE current_class IN ('T S1','T S2','Terminale S')")) return false;
+
     // Anciennes versions : un compte administrateur codé en dur (admin@myschool.local / mot de passe
     // par défaut) était créé automatiquement. Tant qu'il porte encore le mot de passe par défaut,
     // on le retire (suppression logique + e-mail libéré) : l'écran de première configuration
