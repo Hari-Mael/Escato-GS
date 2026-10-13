@@ -884,6 +884,10 @@ QVariantMap SchoolApp::balanceOverview(const QString &fromDate, const QString &t
     QSqlQuery p(m_db.db());
     p.prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE substr(paid_at,1,10) BETWEEN ? AND ?");
     p.addBindValue(from); p.addBindValue(to);
+    QSqlQuery o(m_db.db());
+    o.prepare("SELECT COALESCE(SUM(amount),0) FROM one_time_fees WHERE due_date BETWEEN ? AND ?");
+    o.addBindValue(from); o.addBindValue(to);
+    if (o.exec() && o.next()) billed += o.value(0).toDouble();
     double collected = 0;
     if (p.exec() && p.next()) collected = p.value(0).toDouble();
 
@@ -901,7 +905,7 @@ QVariantMap SchoolApp::balanceOverview(const QString &fromDate, const QString &t
     if (s.exec()) {
         while (s.next()) {
             QVariantMap m;
-            const double sBilled = s.value(3).toDouble();
+            const double sBilled = s.value(3).toDouble() + oneTimeBilled(s.value(0).toInt(), from, to);
             const double sCollected = s.value(4).toDouble();
             m["studentId"] = s.value(0).toInt();
             m["name"] = s.value(1).toString();
@@ -973,4 +977,159 @@ bool SchoolApp::setPermission(const QString &role, const QString &permission, bo
     audit("update", "permission", 0, role + " " + permission + (allowedValue ? " = oui" : " = non"));
     emit dataChanged();
     return true;
+}
+
+QVariantList SchoolApp::feeTypes() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name,default_amount FROM fee_types WHERE is_active=1 ORDER BY name")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["amount"] = q.value(2).toDouble();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addFeeType(const QVariantMap &v)
+{
+    if (!can("fees.onetime.manage")) return false;
+    const QString name = v.value("name").toString().trimmed();
+    const double amount = v.value("amount").toDouble();
+    if (name.isEmpty() || amount < 0) {
+        emit errorOccurred(QStringLiteral("Nom et montant valides requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO fee_types(name,default_amount) VALUES(?,?)");
+    q.addBindValue(name);
+    q.addBindValue(amount);
+    if (!q.exec()) {
+        emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce type de frais existe déjà.") : q.lastError().text());
+        return false;
+    }
+    audit("create", "fee_type", q.lastInsertId().toInt(), name);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::assignOneTimeFeeToClass(int feeTypeId, const QString &className, double amount, const QString &dueDate)
+{
+    if (!can("fees.onetime.manage")) return false;
+    const QDate due = QDate::fromString(dueDate.trimmed(), "yyyy-MM-dd");
+    if (!due.isValid() || amount < 0 || !classes().contains(className)) {
+        emit errorOccurred(QStringLiteral("Classe, montant et échéance (AAAA-MM-JJ) valides requis."));
+        return false;
+    }
+    QSqlDatabase db = m_db.db();
+    if (!db.transaction()) return false;
+    QSqlQuery q(db);
+    q.prepare("INSERT INTO one_time_fees(student_id,fee_type_id,amount,due_date,status) "
+              "SELECT id,?,?,?,'pending' FROM students WHERE current_class=? AND deleted_at IS NULL AND graduated_at IS NULL");
+    q.addBindValue(feeTypeId);
+    q.addBindValue(amount);
+    q.addBindValue(due.toString("yyyy-MM-dd"));
+    q.addBindValue(className);
+    if (!q.exec()) { db.rollback(); emit errorOccurred(q.lastError().text()); return false; }
+    const int count = q.numRowsAffected();
+    if (count == 0) {
+        db.rollback();
+        emit errorOccurred(QStringLiteral("Aucun élève inscrit dans cette classe."));
+        return false;
+    }
+    db.commit();
+    audit("create", "one_time_fee", feeTypeId, className + " (" + QString::number(count) + " élèves)");
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::studentOneTimeFees(int studentId) const
+{
+    QVariantList out;
+    if (!canViewStudent(studentId)) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT o.id,t.name,o.amount,o.due_date,o.status,o.payment_id FROM one_time_fees o "
+              "JOIN fee_types t ON t.id=o.fee_type_id WHERE o.student_id=? ORDER BY o.due_date DESC");
+    q.addBindValue(studentId);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["amount"] = q.value(2).toDouble();
+        m["dueDate"] = q.value(3).toString();
+        m["status"] = q.value(4).toString();
+        m["paymentId"] = q.value(5).toInt();
+        out << m;
+    }
+    return out;
+}
+
+int SchoolApp::payOneTimeFee(int feeId, const QString &method, const QString &reference)
+{
+    if (!can("fees.onetime.pay")) return 0;
+    QSqlDatabase db = m_db.db();
+    if (!db.transaction()) return 0;
+
+    QSqlQuery f(db);
+    f.prepare("SELECT o.student_id,o.amount,t.name FROM one_time_fees o JOIN fee_types t ON t.id=o.fee_type_id "
+              "WHERE o.id=? AND o.status='pending'");
+    f.addBindValue(feeId);
+    if (!f.exec() || !f.next()) {
+        db.rollback();
+        emit errorOccurred(QStringLiteral("Frais introuvable ou déjà payé."));
+        return 0;
+    }
+    const int studentId = f.value(0).toInt();
+    const double amount = f.value(1).toDouble();
+    const QString name = f.value(2).toString();
+    const QString paidAt = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss");
+
+    QSqlQuery p(db);
+    p.prepare("INSERT INTO payments(student_id,recorded_by,amount,method,payer_role,reference,paid_at,notes) "
+              "VALUES(?,?,?,?,'eleve',?,?,?)");
+    p.addBindValue(studentId);
+    p.addBindValue(m_userId);
+    p.addBindValue(amount);
+    p.addBindValue(method);
+    p.addBindValue(reference.trimmed());
+    p.addBindValue(paidAt);
+    p.addBindValue(QStringLiteral("Frais ponctuel : ") + name);
+    if (!p.exec()) { db.rollback(); emit errorOccurred(p.lastError().text()); return 0; }
+    const int paymentId = p.lastInsertId().toInt();
+
+    const QString year = paidAt.left(4);
+    QSqlQuery seq(db);
+    seq.prepare("SELECT COALESCE(MAX(CAST(substr(receipt_number,-5) AS INTEGER)),0)+1 FROM payments WHERE receipt_number LIKE ?");
+    seq.addBindValue(QStringLiteral("REC-%1-%").arg(year));
+    const int next = seq.exec() && seq.next() ? seq.value(0).toInt() : 1;
+    QSqlQuery rn(db);
+    rn.prepare("UPDATE payments SET receipt_number=? WHERE id=?");
+    rn.addBindValue(QStringLiteral("REC-%1-%2").arg(year).arg(next, 5, 10, QLatin1Char('0')));
+    rn.addBindValue(paymentId);
+    rn.exec();
+
+    QSqlQuery u(db);
+    u.prepare("UPDATE one_time_fees SET status='paid', payment_id=? WHERE id=?");
+    u.addBindValue(paymentId);
+    u.addBindValue(feeId);
+    if (!u.exec()) { db.rollback(); emit errorOccurred(u.lastError().text()); return 0; }
+
+    db.commit();
+    audit("create", "payment", paymentId, QStringLiteral("frais ponctuel %1").arg(feeId));
+    emit dataChanged();
+    return paymentId;
+}
+
+double SchoolApp::oneTimeBilled(int studentId, const QString &from, const QString &to) const
+{
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT COALESCE(SUM(amount),0) FROM one_time_fees WHERE student_id=? AND due_date BETWEEN ? AND ?");
+    q.addBindValue(studentId);
+    q.addBindValue(from);
+    q.addBindValue(to);
+    return q.exec() && q.next() ? q.value(0).toDouble() : 0.0;
 }
