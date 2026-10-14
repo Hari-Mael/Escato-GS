@@ -68,6 +68,7 @@ qt_add_qml_module(escato_app
         qml/pages/AccountingExtraPage.qml
         qml/pages/FinanceExtraPage.qml
         qml/pages/ImportPage.qml
+        qml/pages/EmailPage.qml
 )
 
 qt_add_resources(escato_app "escato_resources"
