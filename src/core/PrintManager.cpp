@@ -686,6 +686,21 @@ bool drawBulletin(Page &pg, int studentId, const QString &term)
     p.setFont(QFont("Arial", 11));
     pg.text(45, y, QStringLiteral("Appréciation générale : ") + (count ? appreciationFor(general) : QStringLiteral("—")));
 
+    y += 30;
+    p.setFont(QFont("Arial", 10));
+    QSqlQuery att(QSqlDatabase::database());
+    att.prepare("SELECT COALESCE(SUM(status='absent'),0), COALESCE(SUM(status='late'),0) FROM attendance WHERE student_id=?");
+    att.addBindValue(studentId);
+    int absences = 0, lates = 0;
+    if (att.exec() && att.next()) { absences = att.value(0).toInt(); lates = att.value(1).toInt(); }
+    QSqlQuery inc(QSqlDatabase::database());
+    inc.prepare("SELECT COUNT(*) FROM incidents WHERE student_id=?");
+    inc.addBindValue(studentId);
+    const int incidents = inc.exec() && inc.next() ? inc.value(0).toInt() : 0;
+    pg.text(45, y, QStringLiteral("Absences : ") + QString::number(absences)
+            + QStringLiteral("     Retards : ") + QString::number(lates)
+            + QStringLiteral("     Incidents disciplinaires : ") + QString::number(incidents));
+
     const double sigY = y + 90;
     p.setFont(QFont("Arial", 10, QFont::Bold));
     pg.text(370, sigY, settingText("signatory_title", "Le Frère Directeur"));

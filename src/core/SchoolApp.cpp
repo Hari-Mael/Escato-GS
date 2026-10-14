@@ -1133,3 +1133,289 @@ double SchoolApp::oneTimeBilled(int studentId, const QString &from, const QStrin
     q.addBindValue(to);
     return q.exec() && q.next() ? q.value(0).toDouble() : 0.0;
 }
+
+QVariantList SchoolApp::subjects() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name,coefficient FROM subjects ORDER BY name")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["coefficient"] = q.value(2).toDouble();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addSubject(const QVariantMap &v)
+{
+    if (!can("subjects.manage")) return false;
+    const QString name = v.value("name").toString().trimmed();
+    const double coef = v.value("coefficient").toDouble();
+    if (name.isEmpty() || coef <= 0) {
+        emit errorOccurred(QStringLiteral("Nom et coefficient (> 0) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO subjects(name,coefficient) VALUES(?,?)");
+    q.addBindValue(name);
+    q.addBindValue(coef);
+    if (!q.exec()) {
+        emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cette matière existe déjà.") : q.lastError().text());
+        return false;
+    }
+    audit("create", "subject", q.lastInsertId().toInt(), name);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteSubject(int id)
+{
+    if (!can("subjects.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM subjects WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "subject", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::classAssignments(const QString &className) const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT a.id,a.class_name,s.id,s.name,COALESCE(u.id,0),COALESCE(u.name,'non affecté') "
+              "FROM class_assignments a JOIN subjects s ON s.id=a.subject_id LEFT JOIN users u ON u.id=a.teacher_id "
+              "WHERE a.class_name=? ORDER BY s.name");
+    q.addBindValue(className);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["className"] = q.value(1).toString();
+        m["subjectId"] = q.value(2).toInt();
+        m["subject"] = q.value(3).toString();
+        m["teacherId"] = q.value(4).toInt();
+        m["teacher"] = q.value(5).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::setClassAssignment(const QString &className, int subjectId, int teacherId)
+{
+    if (!can("assignments.manage")) return false;
+    if (!classes().contains(className) || subjectId <= 0) {
+        emit errorOccurred(QStringLiteral("Classe et matière requises."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO class_assignments(class_name,subject_id,teacher_id) VALUES(?,?,?) "
+              "ON CONFLICT(class_name,subject_id) DO UPDATE SET teacher_id=excluded.teacher_id");
+    q.addBindValue(className);
+    q.addBindValue(subjectId);
+    q.addBindValue(teacherId > 0 ? QVariant(teacherId) : QVariant());
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("update", "assignment", subjectId, className);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteClassAssignment(int id)
+{
+    if (!can("assignments.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM class_assignments WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "assignment", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::timetableSlots(const QString &className) const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT t.id,t.weekday,t.start_time,t.end_time,COALESCE(s.name,''),COALESCE(t.room,'') "
+              "FROM timetable_slots t LEFT JOIN subjects s ON s.id=t.subject_id WHERE t.class_name=? ORDER BY t.weekday,t.start_time");
+    q.addBindValue(className);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["weekday"] = q.value(1).toInt();
+        m["startTime"] = q.value(2).toString();
+        m["endTime"] = q.value(3).toString();
+        m["subject"] = q.value(4).toString();
+        m["room"] = q.value(5).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addTimetableSlot(const QVariantMap &v)
+{
+    if (!can("timetable.manage")) return false;
+    const QString className = v.value("className").toString();
+    const int weekday = v.value("weekday").toInt();
+    const QTime start = QTime::fromString(v.value("start").toString(), "HH:mm");
+    const QTime end = QTime::fromString(v.value("end").toString(), "HH:mm");
+    if (!classes().contains(className) || weekday < 1 || weekday > 6 || !start.isValid() || !end.isValid() || end <= start) {
+        emit errorOccurred(QStringLiteral("Classe, jour (lundi à samedi) et horaires valides requis (HH:mm, fin après début)."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO timetable_slots(class_name,weekday,start_time,end_time,subject_id,room) VALUES(?,?,?,?,?,?)");
+    q.addBindValue(className);
+    q.addBindValue(weekday);
+    q.addBindValue(start.toString("HH:mm"));
+    q.addBindValue(end.toString("HH:mm"));
+    const int subjectId = v.value("subjectId").toInt();
+    q.addBindValue(subjectId > 0 ? QVariant(subjectId) : QVariant());
+    q.addBindValue(v.value("room").toString().trimmed());
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "timetable_slot", q.lastInsertId().toInt(), className);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteTimetableSlot(int id)
+{
+    if (!can("timetable.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM timetable_slots WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "timetable_slot", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::attendanceFor(const QString &className, const QString &day) const
+{
+    QVariantList out;
+    if (!can("attendance.record")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT s.id,s.last_name || ' ' || s.first_name,COALESCE(a.status,'present') FROM students s "
+              "LEFT JOIN attendance a ON a.student_id=s.id AND a.day=? "
+              "WHERE s.current_class=? AND s.deleted_at IS NULL AND s.graduated_at IS NULL ORDER BY s.last_name,s.first_name");
+    q.addBindValue(day);
+    q.addBindValue(className);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["studentId"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["status"] = q.value(2).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::setAttendance(int studentId, const QString &day, const QString &status)
+{
+    if (!can("attendance.record")) return false;
+    if (!QDate::fromString(day, "yyyy-MM-dd").isValid()) return false;
+    if (!QStringList({"present", "absent", "late", "excused"}).contains(status)) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO attendance(student_id,day,status) VALUES(?,?,?) "
+              "ON CONFLICT(student_id,day) DO UPDATE SET status=excluded.status");
+    q.addBindValue(studentId);
+    q.addBindValue(day);
+    q.addBindValue(status);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::incidents(int studentId) const
+{
+    QVariantList out;
+    if (!canViewStudent(studentId)) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT id,incident_date,category,COALESCE(description,''),COALESCE(sanction,'') FROM incidents "
+              "WHERE student_id=? ORDER BY incident_date DESC, id DESC");
+    q.addBindValue(studentId);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["date"] = q.value(1).toString();
+        m["category"] = q.value(2).toString();
+        m["description"] = q.value(3).toString();
+        m["sanction"] = q.value(4).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addIncident(const QVariantMap &v)
+{
+    if (!can("discipline.record")) return false;
+    const int studentId = v.value("studentId").toInt();
+    const QDate date = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const QString category = v.value("category").toString().trimmed();
+    if (studentId <= 0 || !date.isValid() || category.isEmpty()) {
+        emit errorOccurred(QStringLiteral("Élève, date (AAAA-MM-JJ) et catégorie requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO incidents(student_id,incident_date,category,description,sanction,recorded_by) VALUES(?,?,?,?,?,?)");
+    q.addBindValue(studentId);
+    q.addBindValue(date.toString("yyyy-MM-dd"));
+    q.addBindValue(category);
+    q.addBindValue(v.value("description").toString().trimmed());
+    q.addBindValue(v.value("sanction").toString().trimmed());
+    q.addBindValue(m_userId);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "incident", q.lastInsertId().toInt(), category);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::deliberation(const QString &className, const QString &term) const
+{
+    QVariantList out;
+    if (!can("deliberations.view")) return out;
+    QSqlQuery st(m_db.db());
+    st.prepare("SELECT id,last_name || ' ' || first_name FROM students WHERE current_class=? AND deleted_at IS NULL "
+               "AND graduated_at IS NULL ORDER BY last_name,first_name");
+    st.addBindValue(className);
+    if (!st.exec()) return out;
+    while (st.next()) {
+        const int sid = st.value(0).toInt();
+        QSqlQuery g(m_db.db());
+        g.prepare("SELECT ROUND(AVG((gr.score*20.0)/e.max_score),2), COALESCE(sb.coefficient,1) FROM grades gr "
+                  "JOIN exams e ON e.id=gr.exam_id JOIN courses c ON c.id=e.course_id "
+                  "LEFT JOIN subjects sb ON sb.name=c.subject WHERE gr.student_id=? AND e.term=? "
+                  "GROUP BY c.subject, COALESCE(sb.coefficient,1)");
+        g.addBindValue(sid);
+        g.addBindValue(term);
+        double sum = 0, coefSum = 0;
+        bool any = false;
+        if (g.exec()) {
+            while (g.next()) {
+                any = true;
+                sum += g.value(0).toDouble() * g.value(1).toDouble();
+                coefSum += g.value(1).toDouble();
+            }
+        }
+        QVariantMap m;
+        m["studentId"] = sid;
+        m["name"] = st.value(1).toString();
+        if (any && coefSum > 0) {
+            const double avg = sum / coefSum;
+            m["average"] = QString::number(avg, 'f', 2);
+            m["decision"] = avg >= 10 ? QStringLiteral("Admis") : avg >= 8 ? QStringLiteral("Rattrapage") : QStringLiteral("Ajourné");
+        } else {
+            m["average"] = QString();
+            m["decision"] = QStringLiteral("—");
+        }
+        out << m;
+    }
+    return out;
+}

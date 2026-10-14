@@ -143,6 +143,21 @@ public:
     Q_INVOKABLE QVariantList studentOneTimeFees(int studentId) const;
     Q_INVOKABLE int payOneTimeFee(int feeId, const QString &method, const QString &reference);
 
+    Q_INVOKABLE QVariantList subjects() const;
+    Q_INVOKABLE bool addSubject(const QVariantMap &v);
+    Q_INVOKABLE bool deleteSubject(int id);
+    Q_INVOKABLE QVariantList classAssignments(const QString &className) const;
+    Q_INVOKABLE bool setClassAssignment(const QString &className, int subjectId, int teacherId);
+    Q_INVOKABLE bool deleteClassAssignment(int id);
+    Q_INVOKABLE QVariantList timetableSlots(const QString &className) const;
+    Q_INVOKABLE bool addTimetableSlot(const QVariantMap &v);
+    Q_INVOKABLE bool deleteTimetableSlot(int id);
+    Q_INVOKABLE QVariantList attendanceFor(const QString &className, const QString &day) const;
+    Q_INVOKABLE bool setAttendance(int studentId, const QString &day, const QString &status);
+    Q_INVOKABLE QVariantList incidents(int studentId) const;
+    Q_INVOKABLE bool addIncident(const QVariantMap &v);
+    Q_INVOKABLE QVariantList deliberation(const QString &className, const QString &term) const;
+
     Q_INVOKABLE QVariantList classTuitions() const;
     Q_INVOKABLE bool setClassTuition(const QString &className, double monthlyAmount);
     Q_INVOKABLE QVariantMap balanceOverview(const QString &fromDate, const QString &toDate) const;

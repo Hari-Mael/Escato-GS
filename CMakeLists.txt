@@ -59,6 +59,10 @@ qt_add_qml_module(escato_app
         qml/pages/AuditPage.qml
         qml/pages/FeesPage.qml
         qml/pages/RolesPage.qml
+        qml/pages/CurriculumPage.qml
+        qml/pages/AttendancePage.qml
+        qml/pages/DisciplinePage.qml
+        qml/pages/CouncilPage.qml
 )
 
 qt_add_resources(escato_app "escato_resources"
