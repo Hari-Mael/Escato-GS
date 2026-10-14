@@ -91,6 +91,8 @@ public:
     Q_INVOKABLE QVariantList students(const QString &className = QString(), const QString &search = QString()) const;
     Q_INVOKABLE QVariantMap student(int id) const;
     Q_INVOKABLE bool addStudent(const QVariantMap &v);
+    Q_INVOKABLE QVariantMap importStudentsCsv(const QString &csv);
+    Q_INVOKABLE QString studentsCsvTemplate() const;
     Q_INVOKABLE bool updateStudent(int id, const QVariantMap &v);
     Q_INVOKABLE bool deleteStudent(int id);
     Q_INVOKABLE bool graduateStudent(int id);

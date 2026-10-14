@@ -2441,3 +2441,101 @@ QVariantMap SchoolApp::financialStatements(const QString &fromDate, const QStrin
     out["result"] = revenue - expenses;
     return out;
 }
+
+QString SchoolApp::studentsCsvTemplate() const
+{
+    return QStringLiteral("nom;prenom;date_naissance;lieu_naissance;classe;telephone_parent;email_parent;adresse\n");
+}
+
+QVariantMap SchoolApp::importStudentsCsv(const QString &csv)
+{
+    QVariantMap out;
+    QVariantList errors;
+    int imported = 0;
+    out["imported"] = 0;
+    out["rejected"] = 0;
+    if (!can("students.create")) {
+        emit errorOccurred(QStringLiteral("Droit insuffisant pour importer des élèves."));
+        out["errors"] = errors;
+        return out;
+    }
+    QStringList lines;
+    for (const QString &raw : csv.split('\n')) {
+        const QString line = raw.trimmed();
+        if (!line.isEmpty()) lines << line;
+    }
+    if (lines.size() < 2) {
+        errors << QStringLiteral("Il faut une ligne d'en-tête et au moins une ligne d'élève.");
+        out["errors"] = errors;
+        out["rejected"] = errors.size();
+        return out;
+    }
+    const QChar delim = lines.first().contains(';') ? QChar(';') : QChar(',');
+    auto clean = [](QString f) { f = f.trimmed(); if (f.startsWith('"') && f.endsWith('"') && f.size() >= 2) f = f.mid(1, f.size() - 2); return f.trimmed(); };
+    auto normKey = [](QString k) { k = k.trimmed().toLower(); k.remove('_'); k.remove(' '); k.remove('-'); return k; };
+
+    QVariantMap alias;
+    alias["nom"] = "lastName"; alias["lastname"] = "lastName";
+    alias["prenom"] = "firstName"; alias["prénom"] = "firstName"; alias["firstname"] = "firstName";
+    alias["datenaissance"] = "birthDate"; alias["birthdate"] = "birthDate";
+    alias["lieunaissance"] = "birthPlace"; alias["birthplace"] = "birthPlace";
+    alias["classe"] = "className"; alias["classname"] = "className";
+    alias["telephoneparent"] = "parentPhone"; alias["parentphone"] = "parentPhone";
+    alias["emailparent"] = "parentEmail"; alias["parentemail"] = "parentEmail";
+    alias["adresse"] = "address"; alias["address"] = "address";
+
+    QStringList header;
+    for (const QString &h : lines.first().split(delim)) header << normKey(clean(h));
+    QVariantList columns;
+    for (const QString &h : header) columns << alias.value(h, QString()).toString();
+    const QStringList required = {"lastName", "firstName", "birthDate", "className", "parentPhone", "address"};
+    QStringList missing;
+    for (const QString &r : required) if (!columns.contains(r)) missing << r;
+    if (!missing.isEmpty()) {
+        errors << QStringLiteral("Colonnes manquantes dans l'en-tête : ") + missing.join(", ");
+        out["errors"] = errors;
+        out["rejected"] = errors.size();
+        return out;
+    }
+
+    const QStringList classList = classes();
+    for (int i = 1; i < lines.size(); ++i) {
+        const QStringList fields = lines.at(i).split(delim);
+        QVariantMap row;
+        for (int c = 0; c < columns.size() && c < fields.size(); ++c) {
+            const QString key = columns.at(c).toString();
+            if (!key.isEmpty()) row[key] = clean(fields.at(c));
+        }
+        const QString where = QStringLiteral("Ligne %1 : ").arg(i + 1);
+        bool ok = true;
+        for (const QString &r : required) {
+            if (row.value(r).toString().isEmpty()) { errors << where + QStringLiteral("champ « %1 » vide").arg(r); ok = false; break; }
+        }
+        if (!ok) continue;
+        if (!classList.contains(row.value("className").toString())) {
+            errors << where + QStringLiteral("classe inconnue « %1 »").arg(row.value("className").toString());
+            continue;
+        }
+        if (!QDate::fromString(row.value("birthDate").toString(), "yyyy-MM-dd").isValid()) {
+            errors << where + QStringLiteral("date de naissance invalide (AAAA-MM-JJ attendu)");
+            continue;
+        }
+        QSqlQuery dup(m_db.db());
+        dup.prepare("SELECT COUNT(*) FROM students WHERE last_name=? AND first_name=? AND birth_date=? AND deleted_at IS NULL");
+        dup.addBindValue(row.value("lastName").toString());
+        dup.addBindValue(row.value("firstName").toString());
+        dup.addBindValue(row.value("birthDate").toString());
+        if (dup.exec() && dup.next() && dup.value(0).toInt() > 0) {
+            errors << where + QStringLiteral("élève déjà présent (même nom, prénom et date de naissance)");
+            continue;
+        }
+        if (addStudent(row)) ++imported;
+        else errors << where + QStringLiteral("enregistrement refusé");
+    }
+    audit("import", "students", imported, QStringLiteral("%1 élèves importés").arg(imported));
+    if (imported > 0) emit dataChanged();
+    out["imported"] = imported;
+    out["rejected"] = errors.size();
+    out["errors"] = errors;
+    return out;
+}

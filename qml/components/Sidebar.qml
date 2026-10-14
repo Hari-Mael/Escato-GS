@@ -56,6 +56,7 @@ Rectangle {
                 ["finreports", "Rapports financiers", "📊"],
                 ["treasury", "Caisse, banque et clôtures", "🏦"],
                 ["finextra", "Bourses, affectations et états", "📑"],
+                ["import", "Importation des données", "📥"],
                 ["finance", "Paiements / factures", "💰"],
                 ["accounting", "Comptabilité", "🧾"],
                 ["communication", "Messages / annonces", "💬"],
