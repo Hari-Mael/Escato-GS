@@ -129,7 +129,13 @@ QStringList SchoolApp::classes() const
     return out;
 }
 QStringList SchoolApp::roles() const { return {"administrateur","enseignant","eleve","parent","comptable"}; }
-QStringList SchoolApp::paymentMethods() const { return {"mvola","orange_money","airtel_money","virement","especes"}; }
+QStringList SchoolApp::paymentMethods() const
+{
+    QStringList out;
+    QSqlQuery q(m_db.db());
+    if (q.exec("SELECT code FROM payment_methods WHERE is_active=1 ORDER BY rowid")) while (q.next()) out << q.value(0).toString();
+    return out;
+}
 QStringList SchoolApp::terms() const { return {"Trimestre 1","Trimestre 2","Trimestre 3"}; }
 
 bool SchoolApp::allowed(const QStringList &rs) const { return m_userId > 0 && rs.contains(m_role); }
@@ -287,6 +293,7 @@ bool SchoolApp::addPayment(const QVariantMap &v)
     if(!can("payments.create")) return false;
     const double amount = v.value("amount").toDouble();
     if(amount <= 0.0) return false;
+    if(!periodOpenFor(v.value("paidAt").toString())) { emit errorOccurred(QStringLiteral("Période comptable clôturée : enregistrement refusé.")); return false; }
     QSqlDatabase db=m_db.db();
     if(!db.transaction()) return false;
 
@@ -412,6 +419,7 @@ bool SchoolApp::addExpense(const QVariantMap &v)
 {
     if(!can("accounting.write")) return false;
     const double amount=v.value("amount").toDouble(); if(amount<=0) return false;
+    if(!periodOpenFor(v.value("date").toString())) { emit errorOccurred(QStringLiteral("Période comptable clôturée : dépense refusée.")); return false; }
     QSqlDatabase db=m_db.db(); if(!db.transaction()) return false;
     QSqlQuery q(db); q.prepare("INSERT INTO expenses(expense_date,category,description,amount,payment_method,reference,account_code,recorded_by) VALUES(?,?,?,?,?,?,?,?)");
     q.addBindValue(v.value("date")); q.addBindValue(v.value("category")); q.addBindValue(v.value("description")); q.addBindValue(amount);
@@ -1797,4 +1805,394 @@ QVariantList SchoolApp::monthlyCollections(int year) const
         out << m;
     }
     return out;
+}
+
+bool SchoolApp::periodOpenFor(const QString &dateText) const
+{
+    const QString d = dateText.trimmed().isEmpty() ? QDate::currentDate().toString("yyyy-MM-dd") : dateText.trimmed().left(10);
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT COUNT(*) FROM accounting_periods WHERE closed=1 AND ? BETWEEN start_date AND end_date");
+    q.addBindValue(d);
+    return !(q.exec() && q.next() && q.value(0).toInt() > 0);
+}
+
+QVariantList SchoolApp::paymentMethodList() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT code,label,is_active FROM payment_methods ORDER BY rowid")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["code"] = q.value(0).toString();
+        m["label"] = q.value(1).toString();
+        m["active"] = q.value(2).toInt() == 1;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addPaymentMethod(const QString &code, const QString &label)
+{
+    if (!can("paymentmethods.manage")) return false;
+    const QString c = code.trimmed().toLower(), l = label.trimmed();
+    if (c.isEmpty() || l.isEmpty() || c.contains(' ')) { emit errorOccurred(QStringLiteral("Code (sans espace) et libellé requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO payment_methods(code,label,is_active) VALUES(?,?,1)");
+    q.addBindValue(c);
+    q.addBindValue(l);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce moyen de paiement existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "payment_method", 0, c);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::setPaymentMethodActive(const QString &code, bool active)
+{
+    if (!can("paymentmethods.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE payment_methods SET is_active=? WHERE code=?");
+    q.addBindValue(active ? 1 : 0);
+    q.addBindValue(code);
+    if (!q.exec() || q.numRowsAffected() != 1) return false;
+    audit("update", "payment_method", 0, code + (active ? " activé" : " désactivé"));
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::accountingPeriods() const
+{
+    QVariantList out;
+    if (!can("closing.manage") && !can("accounting.write")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,label,start_date,end_date,closed FROM accounting_periods ORDER BY start_date DESC")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["label"] = q.value(1).toString();
+        m["startDate"] = q.value(2).toString();
+        m["endDate"] = q.value(3).toString();
+        m["closed"] = q.value(4).toInt() == 1;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addAccountingPeriod(const QVariantMap &v)
+{
+    if (!can("closing.manage")) return false;
+    const QString label = v.value("label").toString().trimmed();
+    const QDate start = QDate::fromString(v.value("startDate").toString(), "yyyy-MM-dd");
+    const QDate end = QDate::fromString(v.value("endDate").toString(), "yyyy-MM-dd");
+    if (label.isEmpty() || !start.isValid() || !end.isValid() || end < start) {
+        emit errorOccurred(QStringLiteral("Libellé et dates valides (AAAA-MM-JJ, fin après début) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO accounting_periods(label,start_date,end_date,closed) VALUES(?,?,?,0)");
+    q.addBindValue(label);
+    q.addBindValue(start.toString("yyyy-MM-dd"));
+    q.addBindValue(end.toString("yyyy-MM-dd"));
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cette période existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "accounting_period", q.lastInsertId().toInt(), label);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::setAccountingPeriodClosed(int id, bool closed)
+{
+    if (!can("closing.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE accounting_periods SET closed=?, closed_at=? WHERE id=?");
+    q.addBindValue(closed ? 1 : 0);
+    q.addBindValue(closed ? QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss") : QVariant());
+    q.addBindValue(id);
+    if (!q.exec() || q.numRowsAffected() != 1) return false;
+    audit(closed ? "close" : "reopen", "accounting_period", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::cashMovements(const QString &date) const
+{
+    QVariantList out;
+    if (!can("cash.manage")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT id,kind,amount,label FROM cash_movements WHERE movement_date=? ORDER BY id");
+    q.addBindValue(date.trimmed());
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["kind"] = q.value(1).toString();
+        m["amount"] = q.value(2).toDouble();
+        m["label"] = q.value(3).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addCashMovement(const QVariantMap &v)
+{
+    if (!can("cash.manage")) return false;
+    const QDate date = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const QString kind = v.value("kind").toString();
+    const double amount = v.value("amount").toDouble();
+    const QString label = v.value("label").toString().trimmed();
+    if (!date.isValid() || amount <= 0 || label.isEmpty() || !QStringList({"entree", "sortie"}).contains(kind)) {
+        emit errorOccurred(QStringLiteral("Date, type, montant (> 0) et libellé requis."));
+        return false;
+    }
+    if (!periodOpenFor(date.toString("yyyy-MM-dd"))) { emit errorOccurred(QStringLiteral("Période comptable clôturée.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO cash_movements(movement_date,kind,amount,label,recorded_by) VALUES(?,?,?,?,?)");
+    q.addBindValue(date.toString("yyyy-MM-dd"));
+    q.addBindValue(kind);
+    q.addBindValue(amount);
+    q.addBindValue(label);
+    q.addBindValue(m_userId);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "cash_movement", q.lastInsertId().toInt(), kind + " " + label);
+    emit dataChanged();
+    return true;
+}
+
+QVariantMap SchoolApp::cashExpected(const QString &date) const
+{
+    QVariantMap out;
+    if (!can("cash.manage")) return out;
+    const QString d = date.trimmed();
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT COALESCE((SELECT SUM(amount) FROM payments WHERE method='especes' AND substr(paid_at,1,10)=?),0) "
+              "+ COALESCE((SELECT SUM(amount) FROM cash_movements WHERE movement_date=? AND kind='entree'),0) "
+              "- COALESCE((SELECT SUM(amount) FROM cash_movements WHERE movement_date=? AND kind='sortie'),0)");
+    q.addBindValue(d); q.addBindValue(d); q.addBindValue(d);
+    out["expected"] = q.exec() && q.next() ? q.value(0).toDouble() : 0.0;
+    return out;
+}
+
+bool SchoolApp::closeCash(const QString &date, double counted)
+{
+    if (!can("cash.manage")) return false;
+    const QDate d = QDate::fromString(date.trimmed(), "yyyy-MM-dd");
+    if (!d.isValid() || counted < 0) { emit errorOccurred(QStringLiteral("Date et montant compté valides requis.")); return false; }
+    const double expected = cashExpected(d.toString("yyyy-MM-dd")).value("expected").toDouble();
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO cash_closings(closing_date,expected,counted,difference,closed_by) VALUES(?,?,?,?,?) "
+              "ON CONFLICT(closing_date) DO UPDATE SET expected=excluded.expected, counted=excluded.counted, "
+              "difference=excluded.difference, closed_by=excluded.closed_by");
+    q.addBindValue(d.toString("yyyy-MM-dd"));
+    q.addBindValue(expected);
+    q.addBindValue(counted);
+    q.addBindValue(counted - expected);
+    q.addBindValue(m_userId);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("close", "cash", 0, d.toString("yyyy-MM-dd") + " écart " + QString::number(counted - expected));
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::cashClosings() const
+{
+    QVariantList out;
+    if (!can("cash.manage")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT closing_date,expected,counted,difference FROM cash_closings ORDER BY closing_date DESC")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["date"] = q.value(0).toString();
+        m["expected"] = q.value(1).toDouble();
+        m["counted"] = q.value(2).toDouble();
+        m["difference"] = q.value(3).toDouble();
+        out << m;
+    }
+    return out;
+}
+
+QVariantList SchoolApp::bankAccounts() const
+{
+    QVariantList out;
+    if (!can("bank.manage")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT a.id,a.name,COALESCE(a.bank,''),COALESCE(a.last4,''),a.opening_balance, "
+                "COALESCE((SELECT SUM(amount) FROM bank_lines WHERE account_id=a.id),0), "
+                "(SELECT COUNT(*) FROM bank_lines WHERE account_id=a.id AND payment_id IS NOT NULL), "
+                "(SELECT COUNT(*) FROM bank_lines WHERE account_id=a.id) FROM bank_accounts a ORDER BY a.name")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["bank"] = q.value(2).toString();
+        m["last4"] = q.value(3).toString();
+        m["balance"] = q.value(4).toDouble() + q.value(5).toDouble();
+        m["reconciled"] = q.value(6).toInt();
+        m["lines"] = q.value(7).toInt();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addBankAccount(const QVariantMap &v)
+{
+    if (!can("bank.manage")) return false;
+    const QString name = v.value("name").toString().trimmed();
+    const QString last4 = v.value("last4").toString().trimmed();
+    if (name.isEmpty() || (!last4.isEmpty() && (last4.size() != 4 || !last4.toInt()))) {
+        emit errorOccurred(QStringLiteral("Nom requis ; seuls les 4 derniers chiffres du compte sont enregistrés."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO bank_accounts(name,bank,last4,opening_balance) VALUES(?,?,?,?)");
+    q.addBindValue(name);
+    q.addBindValue(v.value("bank").toString().trimmed());
+    q.addBindValue(last4);
+    q.addBindValue(v.value("openingBalance").toDouble());
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce compte existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "bank_account", q.lastInsertId().toInt(), name);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::bankLines(int accountId) const
+{
+    QVariantList out;
+    if (!can("bank.manage")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT id,line_date,label,amount,COALESCE(payment_id,0) FROM bank_lines WHERE account_id=? ORDER BY line_date DESC, id DESC");
+    q.addBindValue(accountId);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["lineDate"] = q.value(1).toString();
+        m["label"] = q.value(2).toString();
+        m["amount"] = q.value(3).toDouble();
+        m["paymentId"] = q.value(4).toInt();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addBankLine(const QVariantMap &v)
+{
+    if (!can("bank.manage")) return false;
+    const QDate d = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const double amount = v.value("amount").toDouble();
+    if (!d.isValid() || amount == 0 || v.value("label").toString().trimmed().isEmpty()) {
+        emit errorOccurred(QStringLiteral("Date, libellé et montant (non nul, + ou -) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO bank_lines(account_id,line_date,label,amount) VALUES(?,?,?,?)");
+    q.addBindValue(v.value("accountId").toInt());
+    q.addBindValue(d.toString("yyyy-MM-dd"));
+    q.addBindValue(v.value("label").toString().trimmed());
+    q.addBindValue(amount);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "bank_line", q.lastInsertId().toInt(), v.value("label").toString());
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::unreconciledPayments() const
+{
+    QVariantList out;
+    if (!can("bank.manage")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT p.id,p.amount,p.method,substr(p.paid_at,1,10),s.last_name || ' ' || s.first_name FROM payments p "
+                "JOIN students s ON s.id=p.student_id WHERE p.method<>'especes' "
+                "AND p.id NOT IN (SELECT payment_id FROM bank_lines WHERE payment_id IS NOT NULL) ORDER BY p.paid_at DESC")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["amount"] = q.value(1).toDouble();
+        m["method"] = q.value(2).toString();
+        m["date"] = q.value(3).toString();
+        m["label"] = q.value(3).toString() + " · " + q.value(4).toString() + " · " + QString::number(q.value(1).toDouble(), 'f', 0) + " Ar (" + q.value(2).toString() + ")";
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::reconcileBankLine(int lineId, int paymentId)
+{
+    if (!can("bank.manage")) return false;
+    QSqlQuery c(m_db.db());
+    c.prepare("SELECT ABS(l.amount) = p.amount FROM bank_lines l, payments p WHERE l.id=? AND p.id=? AND l.payment_id IS NULL "
+              "AND p.id NOT IN (SELECT payment_id FROM bank_lines WHERE payment_id IS NOT NULL)");
+    c.addBindValue(lineId);
+    c.addBindValue(paymentId);
+    if (!c.exec() || !c.next()) { emit errorOccurred(QStringLiteral("Rapprochement impossible : ligne ou paiement déjà rapproché.")); return false; }
+    if (c.value(0).toInt() != 1) { emit errorOccurred(QStringLiteral("Le montant de la ligne ne correspond pas au paiement.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE bank_lines SET payment_id=? WHERE id=?");
+    q.addBindValue(paymentId);
+    q.addBindValue(lineId);
+    if (!q.exec()) return false;
+    audit("update", "bank_reconciliation", lineId, "paiement " + QString::number(paymentId));
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::studentSchedule(int studentId) const
+{
+    QVariantList out;
+    if (!canViewStudent(studentId)) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT id,label,due_date,amount FROM payment_schedules WHERE student_id=? ORDER BY due_date,id");
+    q.addBindValue(studentId);
+    if (!q.exec()) return out;
+    QVariantList rows;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["label"] = q.value(1).toString();
+        m["dueDate"] = q.value(2).toString();
+        m["amount"] = q.value(3).toDouble();
+        rows << m;
+    }
+    QSqlQuery p(m_db.db());
+    p.prepare("SELECT COALESCE(SUM(amount),0) FROM payments WHERE student_id=?");
+    p.addBindValue(studentId);
+    const double paid = p.exec() && p.next() ? p.value(0).toDouble() : 0.0;
+    double cumulative = 0;
+    for (const QVariant &v : rows) {
+        QVariantMap m = v.toMap();
+        const double before = cumulative;
+        cumulative += m["amount"].toDouble();
+        m["status"] = paid >= cumulative ? QStringLiteral("paid") : paid > before ? QStringLiteral("partial") : QStringLiteral("pending");
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addScheduleInstallment(int studentId, const QString &label, const QString &dueDate, double amount)
+{
+    if (!can("schedule.manage")) return false;
+    const QDate d = QDate::fromString(dueDate.trimmed(), "yyyy-MM-dd");
+    if (studentId <= 0 || label.trimmed().isEmpty() || !d.isValid() || amount <= 0) {
+        emit errorOccurred(QStringLiteral("Élève, libellé, échéance (AAAA-MM-JJ) et montant (> 0) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO payment_schedules(student_id,label,due_date,amount) VALUES(?,?,?,?)");
+    q.addBindValue(studentId);
+    q.addBindValue(label.trimmed());
+    q.addBindValue(d.toString("yyyy-MM-dd"));
+    q.addBindValue(amount);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "schedule", q.lastInsertId().toInt(), label);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteScheduleInstallment(int id)
+{
+    if (!can("schedule.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM payment_schedules WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "schedule", id);
+    emit dataChanged();
+    return true;
 }

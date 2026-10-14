@@ -311,6 +311,57 @@ bool Database::createSchema()
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS cash_movements(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            movement_date TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK(kind IN ('entree','sortie')),
+            amount REAL NOT NULL,
+            label TEXT NOT NULL,
+            recorded_by INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS cash_closings(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            closing_date TEXT NOT NULL UNIQUE,
+            expected REAL NOT NULL,
+            counted REAL NOT NULL,
+            difference REAL NOT NULL,
+            closed_by INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS bank_accounts(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            bank TEXT,
+            last4 TEXT,
+            opening_balance REAL NOT NULL DEFAULT 0
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS bank_lines(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER NOT NULL REFERENCES bank_accounts(id) ON DELETE CASCADE,
+            line_date TEXT NOT NULL,
+            label TEXT NOT NULL,
+            amount REAL NOT NULL,
+            payment_id INTEGER UNIQUE REFERENCES payments(id) ON DELETE SET NULL
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS payment_methods(
+            code TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS payment_schedules(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            label TEXT NOT NULL,
+            due_date TEXT NOT NULL,
+            amount REAL NOT NULL
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -575,6 +626,18 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO payment_methods(code,label,is_active) VALUES ('mvola','Mvola',1),('orange_money','Orange Money',1),('airtel_money','Airtel Money',1),('virement','Virement bancaire',1),('especes','Espèces',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('cash.manage','Gérer la caisse (mouvements et clôture)','Comptabilité')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','cash.manage',1),('enseignant','cash.manage',0),('eleve','cash.manage',0),('parent','cash.manage',0),('comptable','cash.manage',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('bank.manage','Gérer les comptes bancaires et le rapprochement','Comptabilité')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','bank.manage',1),('enseignant','bank.manage',0),('eleve','bank.manage',0),('parent','bank.manage',0),('comptable','bank.manage',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('closing.manage','Clôturer et rouvrir les périodes comptables','Comptabilité')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','closing.manage',1),('enseignant','closing.manage',0),('eleve','closing.manage',0),('parent','closing.manage',0),('comptable','closing.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('paymentmethods.manage','Gérer les moyens de paiement','Comptabilité')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','paymentmethods.manage',1),('enseignant','paymentmethods.manage',0),('eleve','paymentmethods.manage',0),('parent','paymentmethods.manage',0),('comptable','paymentmethods.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('schedule.manage','Gérer les échéanciers de paiement','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','schedule.manage',1),('enseignant','schedule.manage',0),('eleve','schedule.manage',0),('parent','schedule.manage',0),('comptable','schedule.manage',1)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('finance.reports','Voir les rapports financiers (impayés, situations, tableau financier)','Finances')")) return false;
     if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','finance.reports',1),('enseignant','finance.reports',0),('eleve','finance.reports',0),('parent','finance.reports',0),('comptable','finance.reports',1)")) return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('documents.history','Consulter l''historique des documents imprimés','Documents officiels')")) return false;

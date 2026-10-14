@@ -54,6 +54,7 @@ Rectangle {
                 ["council", "Délibérations", "🎓"],
                 ["administration", "Administration scolaire", "🏛"],
                 ["finreports", "Rapports financiers", "📊"],
+                ["treasury", "Caisse, banque et clôtures", "🏦"],
                 ["finance", "Paiements / factures", "💰"],
                 ["accounting", "Comptabilité", "🧾"],
                 ["communication", "Messages / annonces", "💬"],
