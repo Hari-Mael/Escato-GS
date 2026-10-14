@@ -23,6 +23,8 @@ Item {
         signatory.text = school.setting("signatory_title")
         refreshPerms()
         refreshPeriods()
+        passMark.text = school.setting("pass_mark")
+        retakeMark.text = school.setting("retake_mark")
     }
     Connections {
         target: school
@@ -87,6 +89,42 @@ Item {
                             school.setSetting("school_name", schoolName.text)
                             school.setSetting("school_city", schoolCity.text)
                             school.setSetting("signatory_title", signatory.text)
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                radius: 12
+                color: "white"
+                border.color: "#E5EAEE"
+                implicitHeight: thresholdColumn.implicitHeight + 40
+
+                ColumnLayout {
+                    id: thresholdColumn
+                    x: 20; y: 20
+                    width: parent.width - 40
+                    spacing: 10
+                    Label { text: "Seuils de décision des délibérations"; font.pixelSize: 18; font.bold: true }
+                    Label {
+                        text: "Moyenne sur 20 : admis à partir du premier seuil, rattrapage à partir du second, ajourné en dessous."
+                        color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: 8
+                        Label { text: "Admis à partir de" }
+                        AppTextField { id: passMark; Layout.preferredWidth: 110; enabled: root.canSettings; inputMethodHints: Qt.ImhDigitsOnly }
+                        Label { text: "Rattrapage à partir de" }
+                        AppTextField { id: retakeMark; Layout.preferredWidth: 110; enabled: root.canSettings; inputMethodHints: Qt.ImhDigitsOnly }
+                        AppButton {
+                            text: "Enregistrer"
+                            highlighted: true
+                            visible: root.canSettings
+                            onClicked: {
+                                school.setSetting("pass_mark", passMark.text.replace(",", "."))
+                                school.setSetting("retake_mark", retakeMark.text.replace(",", "."))
+                            }
                         }
                     }
                 }

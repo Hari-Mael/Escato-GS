@@ -1171,6 +1171,29 @@ bool SchoolApp::addSubject(const QVariantMap &v)
     return true;
 }
 
+bool SchoolApp::updateSubject(int id, const QVariantMap &v)
+{
+    if (!can("subjects.manage")) return false;
+    const QString name = v.value("name").toString().trimmed();
+    const double coef = v.value("coefficient").toDouble();
+    if (name.isEmpty() || coef <= 0) {
+        emit errorOccurred(QStringLiteral("Nom et coefficient (> 0) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE subjects SET name=?, coefficient=? WHERE id=?");
+    q.addBindValue(name);
+    q.addBindValue(coef);
+    q.addBindValue(id);
+    if (!q.exec()) {
+        emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cette matière existe déjà.") : q.lastError().text());
+        return false;
+    }
+    audit("update", "subject", id, name + " coef " + QString::number(coef));
+    emit dataChanged();
+    return true;
+}
+
 bool SchoolApp::deleteSubject(int id)
 {
     if (!can("subjects.manage")) return false;
@@ -1410,7 +1433,9 @@ QVariantList SchoolApp::deliberation(const QString &className, const QString &te
         if (any && coefSum > 0) {
             const double avg = sum / coefSum;
             m["average"] = QString::number(avg, 'f', 2);
-            m["decision"] = avg >= 10 ? QStringLiteral("Admis") : avg >= 8 ? QStringLiteral("Rattrapage") : QStringLiteral("Ajourné");
+            const double passMark = setting("pass_mark").isEmpty() ? 10.0 : setting("pass_mark").toDouble();
+            const double retakeMark = setting("retake_mark").isEmpty() ? 8.0 : setting("retake_mark").toDouble();
+            m["decision"] = avg >= passMark ? QStringLiteral("Admis") : avg >= retakeMark ? QStringLiteral("Rattrapage") : QStringLiteral("Ajourné");
         } else {
             m["average"] = QString();
             m["decision"] = QStringLiteral("—");

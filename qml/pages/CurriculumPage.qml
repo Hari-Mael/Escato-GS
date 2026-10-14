@@ -60,7 +60,11 @@ Item {
                         delegate: RowLayout {
                             Layout.fillWidth: true
                             Label { text: modelData.name; Layout.fillWidth: true }
-                            Label { text: "coef. " + modelData.coefficient; color: "#667085" }
+                            AppTextField { id: coefEdit; text: String(modelData.coefficient); Layout.preferredWidth: 110; inputMethodHints: Qt.ImhDigitsOnly }
+                            AppButton {
+                                text: "Enregistrer"
+                                onClicked: school.updateSubject(modelData.id, {name: modelData.name, coefficient: parseFloat(coefEdit.text.replace(",", ".")) || 0})
+                            }
                             AppButton { text: "Supprimer"; onClicked: school.deleteSubject(modelData.id) }
                         }
                     }

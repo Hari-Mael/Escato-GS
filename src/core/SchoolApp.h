@@ -146,6 +146,7 @@ public:
     Q_INVOKABLE QVariantList subjects() const;
     Q_INVOKABLE bool addSubject(const QVariantMap &v);
     Q_INVOKABLE bool deleteSubject(int id);
+    Q_INVOKABLE bool updateSubject(int id, const QVariantMap &v);
     Q_INVOKABLE QVariantList classAssignments(const QString &className) const;
     Q_INVOKABLE bool setClassAssignment(const QString &className, int subjectId, int teacherId);
     Q_INVOKABLE bool deleteClassAssignment(int id);

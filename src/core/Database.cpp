@@ -531,6 +531,9 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO settings(key,value) VALUES ('pass_mark','10'),('retake_mark','8')"))
+        return false;
+
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('subjects.manage','Gérer les matières','Pédagogie')")) return false;
     if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','subjects.manage',1),('enseignant','subjects.manage',0),('eleve','subjects.manage',0),('parent','subjects.manage',0),('comptable','subjects.manage',0)")) return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('assignments.manage','Affecter les enseignants aux classes','Pédagogie')")) return false;
