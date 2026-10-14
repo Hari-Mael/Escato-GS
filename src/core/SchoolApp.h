@@ -138,6 +138,16 @@ public:
     Q_INVOKABLE QVariantList chartOfAccounts() const;
     Q_INVOKABLE bool addAccount(const QString &code, const QString &label, const QString &type);
     Q_INVOKABLE QVariantList expenses() const;
+    Q_INVOKABLE QVariantList expenseCategories() const;
+    Q_INVOKABLE bool addExpenseCategory(const QString &name);
+    Q_INVOKABLE bool deleteExpenseCategory(int id);
+    Q_INVOKABLE QVariantList unallocatedPayments(int studentId) const;
+    Q_INVOKABLE QVariantList openInvoices(int studentId) const;
+    Q_INVOKABLE bool allocatePayment(int paymentId, int invoiceId, double amount);
+    Q_INVOKABLE QVariantList scholarshipsFor(int studentId) const;
+    Q_INVOKABLE bool addScholarship(const QVariantMap &v);
+    Q_INVOKABLE bool deleteScholarship(int id);
+    Q_INVOKABLE QVariantMap financialStatements(const QString &fromDate, const QString &toDate) const;
     Q_INVOKABLE bool addExpense(const QVariantMap &v);
     Q_INVOKABLE QVariantList journal(const QString &fromDate = QString(), const QString &toDate = QString()) const;
     Q_INVOKABLE QVariantList trialBalance(const QString &fromDate = QString(), const QString &toDate = QString()) const;
@@ -221,6 +231,7 @@ private:
     bool allowed(const QStringList &roles) const;
     double oneTimeBilled(int studentId, const QString &from, const QString &to) const;
     bool periodOpenFor(const QString &dateText) const;
+    double scholarshipPercent(int studentId) const;
     void audit(const QString &action, const QString &entity, int entityId, const QString &details = QString());
     bool execute(const QString &sql, const QVariantList &bind = {});
 };

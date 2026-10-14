@@ -362,6 +362,27 @@ bool Database::createSchema()
             amount REAL NOT NULL
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS payment_allocations(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+            invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+            amount REAL NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS scholarships(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            label TEXT NOT NULL,
+            percent REAL NOT NULL CHECK(percent > 0 AND percent <= 100),
+            school_year TEXT
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS expense_categories(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -626,6 +647,12 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO expense_categories(name) VALUES ('Fournitures'),('Salaires'),('Eau et électricité'),('Entretien'),('Transport'),('Autres')")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('payments.allocate','Affecter un paiement à une facture','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','payments.allocate',1),('enseignant','payments.allocate',0),('eleve','payments.allocate',0),('parent','payments.allocate',0),('comptable','payments.allocate',1)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('scholarships.manage','Gérer les bourses des élèves','Finances')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','scholarships.manage',1),('enseignant','scholarships.manage',0),('eleve','scholarships.manage',0),('parent','scholarships.manage',0),('comptable','scholarships.manage',1)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO payment_methods(code,label,is_active) VALUES ('mvola','Mvola',1),('orange_money','Orange Money',1),('airtel_money','Airtel Money',1),('virement','Virement bancaire',1),('especes','Espèces',1)")) return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('cash.manage','Gérer la caisse (mouvements et clôture)','Comptabilité')")) return false;
     if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','cash.manage',1),('enseignant','cash.manage',0),('eleve','cash.manage',0),('parent','cash.manage',0),('comptable','cash.manage',1)")) return false;
