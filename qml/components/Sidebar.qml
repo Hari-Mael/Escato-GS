@@ -53,6 +53,7 @@ Rectangle {
                 ["discipline", "Discipline", "⚠"],
                 ["council", "Délibérations", "🎓"],
                 ["administration", "Administration scolaire", "🏛"],
+                ["finreports", "Rapports financiers", "📊"],
                 ["finance", "Paiements / factures", "💰"],
                 ["accounting", "Comptabilité", "🧾"],
                 ["communication", "Messages / annonces", "💬"],

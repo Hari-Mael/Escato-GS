@@ -1,9 +1,17 @@
 #pragma once
 #include <QObject>
 #include <QString>
+class SchoolApp;
+
 class PrintManager : public QObject
 {
     Q_OBJECT
+
+public:
+    void setSchool(SchoolApp *school) { m_school = school; }
+
+private:
+    SchoolApp *m_school = nullptr;
 public:
     explicit PrintManager(QObject *parent = nullptr);
     Q_INVOKABLE bool printStudentList(const QString &className = QString());

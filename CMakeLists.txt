@@ -64,6 +64,7 @@ qt_add_qml_module(escato_app
         qml/pages/DisciplinePage.qml
         qml/pages/CouncilPage.qml
         qml/pages/AdministrationPage.qml
+        qml/pages/FinanceReportsPage.qml
 )
 
 qt_add_resources(escato_app "escato_resources"
