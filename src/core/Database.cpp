@@ -383,6 +383,16 @@ bool Database::createSchema()
             name TEXT NOT NULL UNIQUE
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS email_log(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipient TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            status TEXT NOT NULL,
+            error TEXT,
+            user_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -647,6 +657,11 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('email.config','Configurer le serveur d''envoi et la planification','Communication')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','email.config',1),('enseignant','email.config',0),('eleve','email.config',0),('parent','email.config',0),('comptable','email.config',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('email.send','Envoyer des e-mails (relances, situations, tests)','Communication')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','email.send',1),('enseignant','email.send',0),('eleve','email.send',0),('parent','email.send',0),('comptable','email.send',1)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO expense_categories(name) VALUES ('Fournitures'),('Salaires'),('Eau et électricité'),('Entretien'),('Transport'),('Autres')")) return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('payments.allocate','Affecter un paiement à une facture','Finances')")) return false;
     if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','payments.allocate',1),('enseignant','payments.allocate',0),('eleve','payments.allocate',0),('parent','payments.allocate',0),('comptable','payments.allocate',1)")) return false;

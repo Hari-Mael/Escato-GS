@@ -4,6 +4,8 @@
 #include <QStringList>
 #include "Database.h"
 
+#include <QTimer>
+
 class SchoolApp : public QObject
 {
     Q_OBJECT
@@ -186,6 +188,15 @@ public:
     Q_INVOKABLE bool setActiveAcademicPeriod(int id);
     Q_INVOKABLE QVariantList auditLogs(int limit) const;
 
+    Q_INVOKABLE QVariantMap smtpSettings() const;
+    Q_INVOKABLE bool saveSmtpSettings(const QVariantMap &v);
+    Q_INVOKABLE void setSmtpPassword(const QString &password);
+    Q_INVOKABLE bool saveEmailSchedule(bool enabled, const QString &time);
+    Q_INVOKABLE bool sendTestEmail(const QString &to);
+    Q_INVOKABLE int sendOverdueReminders();
+    Q_INVOKABLE bool sendStudentSituation(int studentId);
+    Q_INVOKABLE QVariantList emailLog(int limit) const;
+
     Q_INVOKABLE bool can(const QString &permission) const;
     Q_INVOKABLE QVariantList permissionMatrix() const;
     Q_INVOKABLE bool setPermission(const QString &role, const QString &permission, bool allowedValue);
@@ -222,9 +233,16 @@ signals:
     void dataChanged();
     void errorOccurred(const QString &message);
 
+private slots:
+    void runScheduledEmails();
+
 private:
+    bool sendMail(const QString &to, const QString &subject, const QString &body, QString *error) const;
+    void logEmail(const QString &to, const QString &subject, bool ok, const QString &error);
     Database m_db;
     int m_userId = 0;
+    QString m_smtpPassword;
+    QTimer *m_emailTimer = nullptr;
     QString m_userName;
     QString m_role;
 
