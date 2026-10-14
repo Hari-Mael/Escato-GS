@@ -52,6 +52,7 @@ Rectangle {
                 ["attendance", "Présences", "✅"],
                 ["discipline", "Discipline", "⚠"],
                 ["council", "Délibérations", "🎓"],
+                ["administration", "Administration scolaire", "🏛"],
                 ["finance", "Paiements / factures", "💰"],
                 ["accounting", "Comptabilité", "🧾"],
                 ["communication", "Messages / annonces", "💬"],

@@ -120,12 +120,12 @@ int SchoolApp::pendingInvoiceCount() const { QSqlQuery q(m_db.db()); q.exec("SEL
 
 QStringList SchoolApp::classes() const
 {
-    return {"CP1","CP2","CE1","CE2","CM1","CM2",
-            "6ème 1","6ème 2","6ème 3","5ème 1","5ème 2","5ème 3",
-            "4ème 1","4ème 2","4ème 3","3ème 1","3ème 2","3ème 3",
-            "2nde 1","2nde 2","2nde 3","2nde 4",
-            "1ère L1","1ère L2","1ère S1","1ère S2",
-            "TL1","TL2","TS"};
+    QStringList out;
+    QSqlQuery q(m_db.db());
+    if (q.exec("SELECT name FROM school_classes WHERE is_active=1 ORDER BY sort_order,id")) {
+        while (q.next()) out << q.value(0).toString();
+    }
+    return out;
 }
 QStringList SchoolApp::roles() const { return {"administrateur","enseignant","eleve","parent","comptable"}; }
 QStringList SchoolApp::paymentMethods() const { return {"mvola","orange_money","airtel_money","virement","especes"}; }
@@ -1443,4 +1443,233 @@ QVariantList SchoolApp::deliberation(const QString &className, const QString &te
         out << m;
     }
     return out;
+}
+
+QVariantList SchoolApp::cycles() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name FROM cycles ORDER BY sort_order,id")) return out;
+    while (q.next()) { QVariantMap m; m["id"] = q.value(0).toInt(); m["name"] = q.value(1).toString(); out << m; }
+    return out;
+}
+
+bool SchoolApp::addCycle(const QString &name)
+{
+    if (!can("structure.manage")) return false;
+    const QString n = name.trimmed();
+    if (n.isEmpty()) { emit errorOccurred(QStringLiteral("Nom du cycle requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO cycles(name,sort_order) VALUES(?,(SELECT COALESCE(MAX(sort_order),0)+1 FROM cycles))");
+    q.addBindValue(n);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce cycle existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "cycle", q.lastInsertId().toInt(), n);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteCycle(int id)
+{
+    if (!can("structure.manage")) return false;
+    QSqlQuery c(m_db.db());
+    c.prepare("SELECT COUNT(*) FROM levels WHERE cycle_id=?");
+    c.addBindValue(id);
+    if (c.exec() && c.next() && c.value(0).toInt() > 0) {
+        emit errorOccurred(QStringLiteral("Ce cycle contient des niveaux : supprime-les d'abord."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM cycles WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "cycle", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::levels() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT l.id,l.name,l.cycle_id,c.name FROM levels l JOIN cycles c ON c.id=l.cycle_id "
+                "ORDER BY c.sort_order,l.sort_order,l.id")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["cycleId"] = q.value(2).toInt();
+        m["cycleName"] = q.value(3).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addLevel(const QString &name, int cycleId)
+{
+    if (!can("structure.manage")) return false;
+    const QString n = name.trimmed();
+    if (n.isEmpty() || cycleId <= 0) { emit errorOccurred(QStringLiteral("Nom du niveau et cycle requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO levels(name,cycle_id,sort_order) VALUES(?,?,(SELECT COALESCE(MAX(sort_order),0)+1 FROM levels))");
+    q.addBindValue(n);
+    q.addBindValue(cycleId);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce niveau existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "level", q.lastInsertId().toInt(), n);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteLevel(int id)
+{
+    if (!can("structure.manage")) return false;
+    QSqlQuery c(m_db.db());
+    c.prepare("SELECT COUNT(*) FROM school_classes WHERE level_id=?");
+    c.addBindValue(id);
+    if (c.exec() && c.next() && c.value(0).toInt() > 0) {
+        emit errorOccurred(QStringLiteral("Ce niveau contient des classes : supprime-les ou désactive-les d'abord."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM levels WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "level", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::schoolClasses() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT k.id,k.name,k.level_id,l.name,c.name,k.is_active FROM school_classes k "
+                "JOIN levels l ON l.id=k.level_id JOIN cycles c ON c.id=l.cycle_id ORDER BY k.sort_order,k.id")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["levelId"] = q.value(2).toInt();
+        m["levelName"] = q.value(3).toString();
+        m["cycleName"] = q.value(4).toString();
+        m["isActive"] = q.value(5).toInt() == 1;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addSchoolClass(const QString &name, int levelId)
+{
+    if (!can("structure.manage")) return false;
+    const QString n = name.trimmed();
+    if (n.isEmpty() || levelId <= 0) { emit errorOccurred(QStringLiteral("Nom de la classe et niveau requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO school_classes(name,level_id,sort_order) VALUES(?,?,(SELECT COALESCE(MAX(sort_order),0)+1 FROM school_classes))");
+    q.addBindValue(n);
+    q.addBindValue(levelId);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cette classe existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "school_class", q.lastInsertId().toInt(), n);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::setSchoolClassActive(int id, bool active)
+{
+    if (!can("structure.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE school_classes SET is_active=? WHERE id=?");
+    q.addBindValue(active ? 1 : 0);
+    q.addBindValue(id);
+    if (!q.exec() || q.numRowsAffected() != 1) return false;
+    audit("update", "school_class", id, active ? "réactivée" : "désactivée");
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::rooms() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name,capacity FROM rooms ORDER BY name")) return out;
+    while (q.next()) { QVariantMap m; m["id"] = q.value(0).toInt(); m["name"] = q.value(1).toString(); m["capacity"] = q.value(2).toInt(); out << m; }
+    return out;
+}
+
+bool SchoolApp::addRoom(const QString &name, int capacity)
+{
+    if (!can("structure.manage")) return false;
+    const QString n = name.trimmed();
+    if (n.isEmpty() || capacity < 0) { emit errorOccurred(QStringLiteral("Nom de la salle requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO rooms(name,capacity) VALUES(?,?)");
+    q.addBindValue(n);
+    q.addBindValue(capacity);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cette salle existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "room", q.lastInsertId().toInt(), n);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteRoom(int id)
+{
+    if (!can("structure.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM rooms WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "room", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::calendarEvents() const
+{
+    QVariantList out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,title,start_date,end_date,kind FROM calendar_events ORDER BY start_date,id")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["title"] = q.value(1).toString();
+        m["startDate"] = q.value(2).toString();
+        m["endDate"] = q.value(3).toString();
+        m["kind"] = q.value(4).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addCalendarEvent(const QVariantMap &v)
+{
+    if (!can("calendar.manage")) return false;
+    const QString title = v.value("title").toString().trimmed();
+    const QDate start = QDate::fromString(v.value("startDate").toString(), "yyyy-MM-dd");
+    const QDate end = QDate::fromString(v.value("endDate").toString(), "yyyy-MM-dd");
+    const QString kind = v.value("kind").toString();
+    if (title.isEmpty() || !start.isValid() || !end.isValid() || end < start
+        || !QStringList({"evenement", "ferie", "vacances"}).contains(kind)) {
+        emit errorOccurred(QStringLiteral("Titre, dates valides (AAAA-MM-JJ, fin après début) et type requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO calendar_events(title,start_date,end_date,kind) VALUES(?,?,?,?)");
+    q.addBindValue(title);
+    q.addBindValue(start.toString("yyyy-MM-dd"));
+    q.addBindValue(end.toString("yyyy-MM-dd"));
+    q.addBindValue(kind);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "calendar_event", q.lastInsertId().toInt(), title);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::deleteCalendarEvent(int id)
+{
+    if (!can("calendar.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("DELETE FROM calendar_events WHERE id=?");
+    q.addBindValue(id);
+    if (!q.exec()) return false;
+    audit("delete", "calendar_event", id);
+    emit dataChanged();
+    return true;
 }

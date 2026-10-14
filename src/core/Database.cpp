@@ -267,6 +267,41 @@ bool Database::createSchema()
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS cycles(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS levels(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            cycle_id INTEGER NOT NULL REFERENCES cycles(id),
+            sort_order INTEGER NOT NULL DEFAULT 0
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS school_classes(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            level_id INTEGER NOT NULL REFERENCES levels(id),
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_active INTEGER NOT NULL DEFAULT 1
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS rooms(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            capacity INTEGER NOT NULL DEFAULT 0
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS calendar_events(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK(kind IN ('evenement','ferie','vacances'))
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -531,6 +566,14 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO cycles(id,name,sort_order) VALUES (1,'Primaire',1),(2,'Collège',2),(3,'Lycée',3)")) return false;
+    if (!exec("INSERT OR IGNORE INTO levels(id,name,cycle_id,sort_order) VALUES (1,'CP',1,1),(2,'CE',1,2),(3,'CM',1,3),(4,'6ème',2,4),(5,'5ème',2,5),(6,'4ème',2,6),(7,'3ème',2,7),(8,'2nde',3,8),(9,'1ère',3,9),(10,'Terminale',3,10)")) return false;
+    if (!exec("INSERT OR IGNORE INTO school_classes(id,name,level_id,sort_order) VALUES (1,'CP1',1,1),(2,'CP2',1,2),(3,'CE1',2,3),(4,'CE2',2,4),(5,'CM1',3,5),(6,'CM2',3,6),(7,'6ème 1',4,7),(8,'6ème 2',4,8),(9,'6ème 3',4,9),(10,'5ème 1',5,10),(11,'5ème 2',5,11),(12,'5ème 3',5,12),(13,'4ème 1',6,13),(14,'4ème 2',6,14),(15,'4ème 3',6,15),(16,'3ème 1',7,16),(17,'3ème 2',7,17),(18,'3ème 3',7,18),(19,'2nde 1',8,19),(20,'2nde 2',8,20),(21,'2nde 3',8,21),(22,'2nde 4',8,22),(23,'1ère L1',9,23),(24,'1ère L2',9,24),(25,'1ère S1',9,25),(26,'1ère S2',9,26),(27,'TL1',10,27),(28,'TL2',10,28),(29,'TS',10,29)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('structure.manage','Gérer cycles, niveaux, classes et salles','Administration scolaire')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','structure.manage',1),('enseignant','structure.manage',0),('eleve','structure.manage',0),('parent','structure.manage',0),('comptable','structure.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('calendar.manage','Gérer le calendrier scolaire et les jours fériés','Administration scolaire')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','calendar.manage',1),('enseignant','calendar.manage',0),('eleve','calendar.manage',0),('parent','calendar.manage',0),('comptable','calendar.manage',0)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO settings(key,value) VALUES ('pass_mark','10'),('retake_mark','8')"))
         return false;
 

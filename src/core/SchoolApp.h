@@ -35,6 +35,22 @@ public:
     Q_INVOKABLE void logout();
 
     Q_INVOKABLE QStringList classes() const;
+
+    Q_INVOKABLE QVariantList cycles() const;
+    Q_INVOKABLE bool addCycle(const QString &name);
+    Q_INVOKABLE bool deleteCycle(int id);
+    Q_INVOKABLE QVariantList levels() const;
+    Q_INVOKABLE bool addLevel(const QString &name, int cycleId);
+    Q_INVOKABLE bool deleteLevel(int id);
+    Q_INVOKABLE QVariantList schoolClasses() const;
+    Q_INVOKABLE bool addSchoolClass(const QString &name, int levelId);
+    Q_INVOKABLE bool setSchoolClassActive(int id, bool active);
+    Q_INVOKABLE QVariantList rooms() const;
+    Q_INVOKABLE bool addRoom(const QString &name, int capacity);
+    Q_INVOKABLE bool deleteRoom(int id);
+    Q_INVOKABLE QVariantList calendarEvents() const;
+    Q_INVOKABLE bool addCalendarEvent(const QVariantMap &v);
+    Q_INVOKABLE bool deleteCalendarEvent(int id);
     Q_INVOKABLE QStringList roles() const;
     Q_INVOKABLE QStringList paymentMethods() const;
     Q_INVOKABLE QStringList terms() const;
