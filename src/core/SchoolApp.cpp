@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "SchoolApp.h"
 #include <QSqlQuery>
 #include <QSqlError>
@@ -1672,4 +1673,128 @@ bool SchoolApp::deleteCalendarEvent(int id)
     audit("delete", "calendar_event", id);
     emit dataChanged();
     return true;
+}
+
+void SchoolApp::logDocument(const QString &type, int refId, const QString &label)
+{
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO document_history(doc_type,ref_id,label,user_id) VALUES(?,?,?,?)");
+    q.addBindValue(type);
+    q.addBindValue(refId);
+    q.addBindValue(label);
+    q.addBindValue(m_userId > 0 ? QVariant(m_userId) : QVariant());
+    q.exec();
+}
+
+QVariantList SchoolApp::documentHistory(int limit) const
+{
+    QVariantList out;
+    if (!can("documents.history")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT h.created_at,COALESCE(u.name,'Système'),h.doc_type,h.ref_id,COALESCE(h.label,'') "
+              "FROM document_history h LEFT JOIN users u ON u.id=h.user_id ORDER BY h.id DESC LIMIT ?");
+    q.addBindValue(limit > 0 ? limit : 200);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["createdAt"] = q.value(0).toString();
+        m["user"] = q.value(1).toString();
+        m["docType"] = q.value(2).toString();
+        m["refId"] = q.value(3).toInt();
+        m["label"] = q.value(4).toString();
+        out << m;
+    }
+    return out;
+}
+
+QVariantList SchoolApp::overdueByStudent(const QString &asOf) const
+{
+    QVariantList out;
+    if (!can("finance.reports")) return out;
+    const QString d = asOf.trimmed().isEmpty() ? QDate::currentDate().toString("yyyy-MM-dd") : asOf.trimmed();
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT s.id, s.last_name || ' ' || s.first_name, s.current_class, "
+              "COALESCE((SELECT SUM(i.amount) FROM invoices i WHERE i.student_id=s.id AND i.status IN ('pending','late') AND i.due_date < ?),0), "
+              "COALESCE((SELECT SUM(o.amount) FROM one_time_fees o WHERE o.student_id=s.id AND o.status='pending' AND o.due_date < ?),0), "
+              "COALESCE((SELECT MIN(i.due_date) FROM invoices i WHERE i.student_id=s.id AND i.status IN ('pending','late') AND i.due_date < ?),'') "
+              "FROM students s WHERE s.deleted_at IS NULL AND s.graduated_at IS NULL");
+    q.addBindValue(d); q.addBindValue(d); q.addBindValue(d);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        const double monthly = q.value(3).toDouble();
+        const double oneTime = q.value(4).toDouble();
+        if (monthly + oneTime <= 0) continue;
+        QVariantMap m;
+        m["studentId"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["className"] = q.value(2).toString();
+        m["monthlyDue"] = monthly;
+        m["oneTimeDue"] = oneTime;
+        m["total"] = monthly + oneTime;
+        m["oldestDue"] = q.value(5).toString();
+        out << m;
+    }
+    std::sort(out.begin(), out.end(), [](const QVariant &a, const QVariant &b) {
+        return a.toMap()["total"].toDouble() > b.toMap()["total"].toDouble();
+    });
+    return out;
+}
+
+QVariantList SchoolApp::parentBalances() const
+{
+    QVariantList out;
+    if (!can("finance.reports")) return out;
+    QSqlQuery parents(m_db.db());
+    if (!parents.exec("SELECT id,name,email FROM users WHERE role='parent' AND deleted_at IS NULL ORDER BY name")) return out;
+    while (parents.next()) {
+        const int pid = parents.value(0).toInt();
+        double billed = 0, collected = 0;
+        QSqlQuery links(m_db.db());
+        links.prepare("SELECT student_id FROM parent_student_links WHERE parent_user_id=?");
+        links.addBindValue(pid);
+        if (links.exec()) {
+            while (links.next()) {
+                const int sid = links.value(0).toInt();
+                QSqlQuery b(m_db.db());
+                b.prepare("SELECT COALESCE((SELECT SUM(amount) FROM invoices WHERE student_id=?),0) + "
+                          "COALESCE((SELECT SUM(amount) FROM one_time_fees WHERE student_id=?),0), "
+                          "COALESCE((SELECT SUM(amount) FROM payments WHERE student_id=?),0)");
+                b.addBindValue(sid); b.addBindValue(sid); b.addBindValue(sid);
+                if (b.exec() && b.next()) {
+                    billed += b.value(0).toDouble();
+                    collected += b.value(1).toDouble();
+                }
+            }
+        }
+        QVariantMap m;
+        m["parentId"] = pid;
+        m["name"] = parents.value(1).toString();
+        m["email"] = parents.value(2).toString();
+        m["billed"] = billed;
+        m["collected"] = collected;
+        m["balance"] = billed - collected;
+        out << m;
+    }
+    return out;
+}
+
+QVariantList SchoolApp::monthlyCollections(int year) const
+{
+    QVariantList out;
+    if (!can("finance.reports")) return out;
+    for (int month = 1; month <= 12; ++month) {
+        const QString ym = QStringLiteral("%1-%2").arg(year).arg(month, 2, 10, QLatin1Char('0'));
+        QSqlQuery b(m_db.db());
+        b.prepare("SELECT COALESCE((SELECT SUM(amount) FROM invoices WHERE strftime('%Y-%m',due_date)=?),0) + "
+                  "COALESCE((SELECT SUM(amount) FROM one_time_fees WHERE strftime('%Y-%m',due_date)=?),0), "
+                  "COALESCE((SELECT SUM(amount) FROM payments WHERE strftime('%Y-%m',paid_at)=?),0)");
+        b.addBindValue(ym); b.addBindValue(ym); b.addBindValue(ym);
+        QVariantMap m;
+        m["month"] = ym;
+        m["label"] = QDate(year, month, 1).toString("MMMM yyyy");
+        m["billed"] = b.exec() && b.next() ? b.value(0).toDouble() : 0.0;
+        m["collected"] = b.value(1).toDouble();
+        out << m;
+    }
+    return out;
 }

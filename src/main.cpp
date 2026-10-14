@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
 
     SchoolApp school;
     PrintManager printer;
+    printer.setSchool(&school);
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("school", &school);

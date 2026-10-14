@@ -107,6 +107,11 @@ public:
     Q_INVOKABLE bool setStudentFee(int studentId, double amount);
     Q_INVOKABLE bool generateMonthlyInvoices(const QString &month);
     Q_INVOKABLE bool processPaymentReminders();
+    Q_INVOKABLE QVariantList overdueByStudent(const QString &asOf) const;
+    Q_INVOKABLE QVariantList parentBalances() const;
+    Q_INVOKABLE QVariantList monthlyCollections(int year) const;
+    Q_INVOKABLE QVariantList documentHistory(int limit) const;
+    void logDocument(const QString &type, int refId, const QString &label);
 
     // Comptabilité : caisse, banque, journal, plan comptable et exports
     Q_INVOKABLE QVariantMap accountingDashboard() const;
