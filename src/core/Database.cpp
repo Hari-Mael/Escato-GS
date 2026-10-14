@@ -224,6 +224,49 @@ bool Database::createSchema()
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS subjects(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            coefficient REAL NOT NULL DEFAULT 1
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS class_assignments(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_name TEXT NOT NULL,
+            subject_id INTEGER NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+            teacher_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            UNIQUE(class_name, subject_id)
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS timetable_slots(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_name TEXT NOT NULL,
+            weekday INTEGER NOT NULL CHECK(weekday BETWEEN 1 AND 6),
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            subject_id INTEGER REFERENCES subjects(id) ON DELETE SET NULL,
+            room TEXT
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS attendance(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            day TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('present','absent','late','excused')),
+            UNIQUE(student_id, day)
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS incidents(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+            incident_date TEXT NOT NULL,
+            category TEXT NOT NULL,
+            description TEXT,
+            sanction TEXT,
+            recorded_by INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -488,6 +531,19 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('subjects.manage','Gérer les matières','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','subjects.manage',1),('enseignant','subjects.manage',0),('eleve','subjects.manage',0),('parent','subjects.manage',0),('comptable','subjects.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('assignments.manage','Affecter les enseignants aux classes','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','assignments.manage',1),('enseignant','assignments.manage',0),('eleve','assignments.manage',0),('parent','assignments.manage',0),('comptable','assignments.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('timetable.manage','Gérer l''emploi du temps','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','timetable.manage',1),('enseignant','timetable.manage',0),('eleve','timetable.manage',0),('parent','timetable.manage',0),('comptable','timetable.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('attendance.record','Saisir les présences','Vie scolaire')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','attendance.record',1),('enseignant','attendance.record',1),('eleve','attendance.record',0),('parent','attendance.record',0),('comptable','attendance.record',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('discipline.record','Enregistrer les incidents disciplinaires','Vie scolaire')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','discipline.record',1),('enseignant','discipline.record',1),('eleve','discipline.record',0),('parent','discipline.record',0),('comptable','discipline.record',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('deliberations.view','Voir les délibérations','Pédagogie')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','deliberations.view',1),('enseignant','deliberations.view',1),('eleve','deliberations.view',0),('parent','deliberations.view',0),('comptable','deliberations.view',0)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO fee_types(name,default_amount) VALUES ('Frais d''inscription',0),('Uniforme',0),('Frais d''examen',0),('Carte scolaire',0)"))
         return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES ('fees.onetime.manage','Gérer les types de frais ponctuels et les assigner','Finances')"))
