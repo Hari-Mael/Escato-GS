@@ -53,6 +53,26 @@ public:
     Q_INVOKABLE bool deleteCalendarEvent(int id);
     Q_INVOKABLE QStringList roles() const;
     Q_INVOKABLE QStringList paymentMethods() const;
+    Q_INVOKABLE QVariantList paymentMethodList() const;
+    Q_INVOKABLE bool addPaymentMethod(const QString &code, const QString &label);
+    Q_INVOKABLE bool setPaymentMethodActive(const QString &code, bool active);
+    Q_INVOKABLE QVariantList accountingPeriods() const;
+    Q_INVOKABLE bool addAccountingPeriod(const QVariantMap &v);
+    Q_INVOKABLE bool setAccountingPeriodClosed(int id, bool closed);
+    Q_INVOKABLE QVariantList cashMovements(const QString &date) const;
+    Q_INVOKABLE bool addCashMovement(const QVariantMap &v);
+    Q_INVOKABLE QVariantMap cashExpected(const QString &date) const;
+    Q_INVOKABLE bool closeCash(const QString &date, double counted);
+    Q_INVOKABLE QVariantList cashClosings() const;
+    Q_INVOKABLE QVariantList bankAccounts() const;
+    Q_INVOKABLE bool addBankAccount(const QVariantMap &v);
+    Q_INVOKABLE QVariantList bankLines(int accountId) const;
+    Q_INVOKABLE bool addBankLine(const QVariantMap &v);
+    Q_INVOKABLE QVariantList unreconciledPayments() const;
+    Q_INVOKABLE bool reconcileBankLine(int lineId, int paymentId);
+    Q_INVOKABLE QVariantList studentSchedule(int studentId) const;
+    Q_INVOKABLE bool addScheduleInstallment(int studentId, const QString &label, const QString &dueDate, double amount);
+    Q_INVOKABLE bool deleteScheduleInstallment(int id);
     Q_INVOKABLE QStringList terms() const;
 
     Q_INVOKABLE QVariantList guardians(int studentId) const;
@@ -200,6 +220,7 @@ private:
 
     bool allowed(const QStringList &roles) const;
     double oneTimeBilled(int studentId, const QString &from, const QString &to) const;
+    bool periodOpenFor(const QString &dateText) const;
     void audit(const QString &action, const QString &entity, int entityId, const QString &details = QString());
     bool execute(const QString &sql, const QVariantList &bind = {});
 };
