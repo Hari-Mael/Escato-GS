@@ -29,7 +29,7 @@ Item {
             Layout.fillWidth: true; spacing: 10
             ComboBox { id: classBox; Layout.preferredWidth: 200; model: school.classes(); onCurrentTextChanged: root.refresh() }
             ComboBox { id: termBox; Layout.preferredWidth: 170; model: school.terms(); onCurrentTextChanged: root.refresh() }
-            Label { text: "Admis : moyenne ≥ 10 · Rattrapage : 8 à 10 · Ajourné : < 8"; color: "#667085" }
+            Label { text: "Admis : moyenne ≥ " + school.setting("pass_mark") + " · Rattrapage : ≥ " + school.setting("retake_mark") + " · Ajourné : < " + school.setting("retake_mark"); color: "#667085" }
         }
 
         Rectangle {
