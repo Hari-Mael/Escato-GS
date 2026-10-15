@@ -235,6 +235,7 @@ PrintManager::PrintManager(QObject *parent) : QObject(parent) {}
 
 bool PrintManager::printStudentList(const QString &className)
 {
+    if (!m_school || !m_school->hasPermission("students.view")) return false;
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
     if (dlg.exec() != QDialog::Accepted) return false;
@@ -244,6 +245,7 @@ bool PrintManager::printStudentList(const QString &className)
 
 bool PrintManager::exportStudentsPdf(const QString &path, const QString &className)
 {
+    if (!m_school || !m_school->hasPermission("students.view")) return false;
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);
     printer.setOutputFormat(QPrinter::PdfFormat);
@@ -254,6 +256,7 @@ bool PrintManager::exportStudentsPdf(const QString &path, const QString &classNa
 
 bool PrintManager::printTeacherList()
 {
+    if (!m_school || !(m_school->hasPermission("teachers.manage") || m_school->hasPermission("students.view"))) return false;
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
     if (dlg.exec() != QDialog::Accepted) return false;
@@ -712,6 +715,7 @@ bool drawBulletin(Page &pg, int studentId, const QString &term)
 
 bool PrintManager::printStudentCertificate(int studentId)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("certificat", studentId, QString());
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
@@ -723,6 +727,7 @@ bool PrintManager::printStudentCertificate(int studentId)
 
 bool PrintManager::exportStudentCertificatePdf(const QString &path, int studentId)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("certificat", studentId, QString());
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);
@@ -735,6 +740,7 @@ bool PrintManager::exportStudentCertificatePdf(const QString &path, int studentI
 
 bool PrintManager::printStudentCard(int studentId)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("carte", studentId, QString());
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
@@ -746,6 +752,7 @@ bool PrintManager::printStudentCard(int studentId)
 
 bool PrintManager::exportStudentCardPdf(const QString &path, int studentId)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("carte", studentId, QString());
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);
@@ -758,6 +765,7 @@ bool PrintManager::exportStudentCardPdf(const QString &path, int studentId)
 
 bool PrintManager::printReceipt(int paymentId)
 {
+    if (!m_school || !m_school->isPaymentVisible(paymentId)) return false;
     if (m_school) m_school->logDocument("recu", paymentId, QString());
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
@@ -769,6 +777,7 @@ bool PrintManager::printReceipt(int paymentId)
 
 bool PrintManager::exportReceiptPdf(const QString &path, int paymentId)
 {
+    if (!m_school || !m_school->isPaymentVisible(paymentId)) return false;
     if (m_school) m_school->logDocument("recu", paymentId, QString());
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);
@@ -781,6 +790,7 @@ bool PrintManager::exportReceiptPdf(const QString &path, int paymentId)
 
 bool PrintManager::printPaymentRequest(int studentId)
 {
+    if (!m_school || !m_school->isFinanceVisible(studentId)) return false;
     if (m_school) m_school->logDocument("demande_paiement", studentId, QString());
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
@@ -792,6 +802,7 @@ bool PrintManager::printPaymentRequest(int studentId)
 
 bool PrintManager::exportPaymentRequestPdf(const QString &path, int studentId)
 {
+    if (!m_school || !m_school->isFinanceVisible(studentId)) return false;
     if (m_school) m_school->logDocument("demande_paiement", studentId, QString());
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);
@@ -804,6 +815,7 @@ bool PrintManager::exportPaymentRequestPdf(const QString &path, int studentId)
 
 bool PrintManager::printAttestation(int studentId, const QString &kind)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("attestation_" + kind, studentId, QString());
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
@@ -815,6 +827,7 @@ bool PrintManager::printAttestation(int studentId, const QString &kind)
 
 bool PrintManager::exportAttestationPdf(const QString &path, int studentId, const QString &kind)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("attestation_" + kind, studentId, QString());
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);
@@ -827,6 +840,7 @@ bool PrintManager::exportAttestationPdf(const QString &path, int studentId, cons
 
 bool PrintManager::printBulletin(int studentId, const QString &term)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("bulletin", studentId, QString());
     QPrinter printer(QPrinter::HighResolution);
     QPrintDialog dlg(&printer);
@@ -838,6 +852,7 @@ bool PrintManager::printBulletin(int studentId, const QString &term)
 
 bool PrintManager::exportBulletinPdf(const QString &path, int studentId, const QString &term)
 {
+    if (!m_school || !m_school->isStudentVisible(studentId)) return false;
     if (m_school) m_school->logDocument("bulletin", studentId, QString());
     if (path.isEmpty()) return false;
     QPrinter printer(QPrinter::HighResolution);

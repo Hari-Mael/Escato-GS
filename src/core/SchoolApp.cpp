@@ -165,6 +165,7 @@ bool SchoolApp::execute(const QString &sql, const QVariantList &bind)
 
 QVariantList SchoolApp::students(const QString &className, const QString &search) const
 {
+    if (!((can("students.view")))) return QVariantList();
     QVariantList out; QSqlQuery q(m_db.db());
     QString sql="SELECT s.id,s.matricule,s.last_name,s.first_name,s.birth_date,s.birth_place,s.current_class,s.parent_phone,s.parent_email,s.address,s.previous_school,s.previous_class,s.desired_career,s.graduated_at,s.consecutive_missed_payments,u.account_status,s.entry_date FROM students s LEFT JOIN users u ON u.id=s.user_id WHERE s.deleted_at IS NULL";
     if(!className.isEmpty()) sql+=" AND current_class=?";
@@ -177,6 +178,7 @@ QVariantList SchoolApp::students(const QString &className, const QString &search
 
 QVariantMap SchoolApp::student(int id) const
 {
+    if (!(canViewStudent(id))) return QVariantMap();
     QSqlQuery q(m_db.db());
     q.prepare("SELECT s.id,s.matricule,s.last_name,s.first_name,s.birth_date,s.birth_place,s.current_class,s.parent_phone,s.parent_email,s.address,s.previous_school,s.previous_class,s.desired_career,s.graduated_at,s.consecutive_missed_payments,u.account_status,s.entry_date FROM students s LEFT JOIN users u ON u.id=s.user_id WHERE s.deleted_at IS NULL AND s.id=?");
     q.addBindValue(id);
@@ -221,6 +223,7 @@ bool SchoolApp::blockStudent(int id,const QString &reason)
 }
 bool SchoolApp::unblockStudent(int id)
 {
+    if (!((can("students.block")))) return false;
     QSqlQuery q(m_db.db());q.prepare("SELECT user_id FROM students WHERE id=?");q.addBindValue(id);if(!q.exec()||!q.next()||q.value(0).isNull())return false;return unblockUser(q.value(0).toInt());
 }
 
@@ -269,6 +272,7 @@ bool SchoolApp::deleteResource(int id){if(!can("courses.manage"))return false;re
 
 QVariantList SchoolApp::exams() const
 {
+    if (!((can("grades.edit") || can("deliberations.view")))) return QVariantList();
     QVariantList out;QSqlQuery q("SELECT e.id,e.title,e.term,e.exam_date,e.max_score,e.course_id,c.title,c.subject,c.class_name FROM exams e JOIN courses c ON c.id=e.course_id ORDER BY e.exam_date DESC");while(q.next()){QVariantMap m;m["id"]=q.value(0);m["title"]=q.value(1);m["term"]=q.value(2);m["date"]=q.value(3);m["maxScore"]=q.value(4);m["courseId"]=q.value(5);m["course"]=q.value(6);m["subject"]=q.value(7);m["className"]=q.value(8);out<<m;}return out;
 }
 bool SchoolApp::addExam(const QVariantMap &v){if(!can("exams.manage"))return false;return execute("INSERT INTO exams(course_id,title,term,exam_date,max_score) VALUES(?,?,?,?,?)",{v["courseId"],v["title"],v["term"],v["date"],v["maxScore"]});}
@@ -277,6 +281,7 @@ bool SchoolApp::deleteExam(int id){if(!can("exams.manage"))return false;return e
 
 QVariantList SchoolApp::grades(int examId) const
 {
+    if (!((can("grades.edit") || can("deliberations.view")))) return QVariantList();
     QVariantList out;QSqlQuery q(m_db.db());q.prepare(R"(SELECT s.id,s.matricule,s.last_name,s.first_name,s.current_class,g.score,g.comment FROM students s JOIN exams e ON e.id=? LEFT JOIN grades g ON g.student_id=s.id AND g.exam_id=e.id WHERE s.current_class=(SELECT c.class_name FROM courses c JOIN exams e2 ON e2.course_id=c.id WHERE e2.id=?) AND s.deleted_at IS NULL ORDER BY s.last_name)");q.addBindValue(examId);q.addBindValue(examId);q.exec();while(q.next()){QVariantMap m;m["studentId"]=q.value(0);m["matricule"]=q.value(1);m["lastName"]=q.value(2);m["firstName"]=q.value(3);m["className"]=q.value(4);m["score"]=q.value(5).isNull()?QVariant():q.value(5);m["comment"]=q.value(6);out<<m;}return out;
 }
 bool SchoolApp::saveGrade(int examId,int studentId,double score,const QString &comment){
@@ -288,11 +293,13 @@ bool SchoolApp::saveGrade(int examId,int studentId,double score,const QString &c
 
 QVariantMap SchoolApp::bulletin(int studentId,const QString &term) const
 {
+    if (!(canViewStudent(studentId))) return QVariantMap();
     QVariantMap result;result["student"]=student(studentId);QSqlQuery q(m_db.db());q.prepare(R"(SELECT c.subject,ROUND(AVG((g.score*20.0)/e.max_score),2) FROM grades g JOIN exams e ON e.id=g.exam_id JOIN courses c ON c.id=e.course_id WHERE g.student_id=? AND e.term=? GROUP BY c.subject ORDER BY c.subject)");q.addBindValue(studentId);q.addBindValue(term);q.exec();QVariantList subjects;double sum=0;int n=0;while(q.next()){QVariantMap m;m["subject"]=q.value(0);m["average"]=q.value(1);subjects<<m;sum+=q.value(1).toDouble();n++;}result["subjects"]=subjects;result["generalAverage"]=n?QString::number(sum/n,'f',2):QString();return result;
 }
 
 QVariantList SchoolApp::payments(int studentId) const
 {
+    if (!(financeVisible(studentId))) return QVariantList();
     QVariantList out;QString sql="SELECT p.id,p.student_id,s.last_name||' '||s.first_name,p.amount,p.method,p.payer_role,p.reference,p.paid_at,p.notes FROM payments p JOIN students s ON s.id=p.student_id";if(studentId)sql+=" WHERE p.student_id=?";sql+=" ORDER BY p.paid_at DESC";QSqlQuery q(m_db.db());q.prepare(sql);if(studentId)q.addBindValue(studentId);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","studentId","student","amount","method","payerRole","reference","paidAt","notes"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);out<<m;}return out;
 }
 bool SchoolApp::addPayment(const QVariantMap &v)
@@ -359,10 +366,12 @@ bool SchoolApp::addPayment(const QVariantMap &v)
 
 QVariantList SchoolApp::invoices(const QString &status) const
 {
+    if (!((can("balances.view")))) return QVariantList();
     QVariantList out;QString sql="SELECT i.id,i.student_id,s.last_name||' '||s.first_name,i.period_month,i.due_date,i.amount,i.status FROM invoices i JOIN students s ON s.id=i.student_id";if(!status.isEmpty())sql+=" WHERE i.status=?";sql+=" ORDER BY i.due_date DESC";QSqlQuery q(m_db.db());q.prepare(sql);if(!status.isEmpty())q.addBindValue(status);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","studentId","student","month","dueDate","amount","status"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);out<<m;}return out;
 }
 QVariantList SchoolApp::studentInvoices(int studentId) const
 {
+    if (!(financeVisible(studentId))) return QVariantList();
     QVariantList out;QSqlQuery q(m_db.db());q.prepare("SELECT id,period_month,due_date,amount,status,payment_id FROM invoices WHERE student_id=? ORDER BY due_date DESC");q.addBindValue(studentId);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","month","dueDate","amount","status","paymentId"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);out<<m;}return out;
 }
 bool SchoolApp::setStudentFee(int studentId,double amount){if(!can("fees.student"))return false;return execute("INSERT INTO student_fees(student_id,monthly_amount,set_by) VALUES(?,?,?)",{studentId,amount,m_userId});}
@@ -389,6 +398,7 @@ static QString csvField(const QVariant &value)
 
 QVariantMap SchoolApp::accountingDashboard() const
 {
+    if (!((can("finance.reports") || can("accounting.write")))) return QVariantMap();
     QVariantMap m;
     auto scalar=[&](const QString &sql){ QSqlQuery x(m_db.db()); x.exec(sql); return x.next()?x.value(0):QVariant(0); };
     m["cash"] = scalar("SELECT COALESCE(SUM(debit-credit),0) FROM journal_lines WHERE account_code='531000'");
@@ -402,6 +412,7 @@ QVariantMap SchoolApp::accountingDashboard() const
 
 QVariantList SchoolApp::chartOfAccounts() const
 {
+    if (!((can("finance.reports") || can("accounting.write")))) return QVariantList();
     QVariantList out; QSqlQuery q(m_db.db());
     q.exec("SELECT code,label,account_type,active FROM chart_of_accounts WHERE active=1 ORDER BY code");
     while(q.next()){ QVariantMap m; m["code"]=q.value(0); m["label"]=q.value(1); m["type"]=q.value(2); m["active"]=q.value(3); out<<m; }
@@ -416,6 +427,7 @@ bool SchoolApp::addAccount(const QString &code, const QString &label, const QStr
 
 QVariantList SchoolApp::expenses() const
 {
+    if (!((can("finance.reports") || can("accounting.write")))) return QVariantList();
     QVariantList out; QSqlQuery q(m_db.db());
     q.exec("SELECT e.id,e.expense_date,e.category,e.description,e.amount,e.payment_method,e.reference,e.account_code,COALESCE(u.name,'') FROM expenses e LEFT JOIN users u ON u.id=e.recorded_by ORDER BY e.expense_date DESC,e.id DESC");
     while(q.next()){ QVariantMap m; QStringList k={"id","date","category","description","amount","method","reference","accountCode","recordedBy"}; for(int i=0;i<k.size();++i)m[k[i]]=q.value(i); out<<m; }
@@ -446,6 +458,7 @@ bool SchoolApp::addExpense(const QVariantMap &v)
 
 QVariantList SchoolApp::journal(const QString &fromDate, const QString &toDate) const
 {
+    if (!((can("finance.reports") || can("accounting.write")))) return QVariantList();
     QVariantList out; QString sql="SELECT j.id,j.entry_date,j.journal_code,j.reference,j.description,l.account_code,COALESCE(a.label,''),l.label,l.debit,l.credit FROM journal_entries j JOIN journal_lines l ON l.entry_id=j.id LEFT JOIN chart_of_accounts a ON a.code=l.account_code WHERE 1=1";
     if(!fromDate.isEmpty()) sql+=" AND j.entry_date>=?"; if(!toDate.isEmpty()) sql+=" AND j.entry_date<=?"; sql+=" ORDER BY j.entry_date DESC,j.id DESC,l.id";
     QSqlQuery q(m_db.db());q.prepare(sql);if(!fromDate.isEmpty())q.addBindValue(fromDate);if(!toDate.isEmpty())q.addBindValue(toDate);q.exec();
@@ -454,6 +467,7 @@ QVariantList SchoolApp::journal(const QString &fromDate, const QString &toDate) 
 
 QVariantList SchoolApp::trialBalance(const QString &fromDate, const QString &toDate) const
 {
+    if (!((can("finance.reports") || can("accounting.write")))) return QVariantList();
     QVariantList out; QString sql="SELECT a.code,a.label,COALESCE(SUM(l.debit),0),COALESCE(SUM(l.credit),0),COALESCE(SUM(l.debit-l.credit),0) FROM chart_of_accounts a LEFT JOIN journal_lines l ON l.account_code=a.code LEFT JOIN journal_entries j ON j.id=l.entry_id";
     QStringList where; if(!fromDate.isEmpty())where<<"j.entry_date>=?";if(!toDate.isEmpty())where<<"j.entry_date<=?";if(!where.isEmpty())sql+=" WHERE "+where.join(" AND ");sql+=" GROUP BY a.code,a.label ORDER BY a.code";
     QSqlQuery q(m_db.db());q.prepare(sql);if(!fromDate.isEmpty())q.addBindValue(fromDate);if(!toDate.isEmpty())q.addBindValue(toDate);q.exec();
@@ -462,6 +476,7 @@ QVariantList SchoolApp::trialBalance(const QString &fromDate, const QString &toD
 
 QVariantList SchoolApp::generalLedger(const QString &accountCode, const QString &fromDate, const QString &toDate) const
 {
+    if (!((can("finance.reports") || can("accounting.write")))) return QVariantList();
     QVariantList out; QString sql="SELECT j.entry_date,j.journal_code,j.reference,j.description,l.debit,l.credit FROM journal_entries j JOIN journal_lines l ON l.entry_id=j.id WHERE l.account_code=?";
     if(!fromDate.isEmpty())sql+=" AND j.entry_date>=?";if(!toDate.isEmpty())sql+=" AND j.entry_date<=?";sql+=" ORDER BY j.entry_date,j.id,l.id";
     QSqlQuery q(m_db.db());q.prepare(sql);q.addBindValue(accountCode);if(!fromDate.isEmpty())q.addBindValue(fromDate);if(!toDate.isEmpty())q.addBindValue(toDate);q.exec();double balance=0;
@@ -502,7 +517,8 @@ bool SchoolApp::sendMessage(int recipientId,const QString &subject,const QString
 
 QVariantList SchoolApp::users(const QString &role) const
 {
-    QVariantList out;QSqlQuery q(m_db.db());QString sql="SELECT id,name,email,role,account_status,blocked_reason,blocked_category,requires_password_reset FROM users WHERE deleted_at IS NULL";if(!role.isEmpty())sql+=" AND role=?";sql+=" ORDER BY name";q.prepare(sql);if(!role.isEmpty())q.addBindValue(role);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","name","email","role","status","blockedReason","blockedCategory","requiresPasswordReset"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);out<<m;}return out;
+    if (m_userId <= 0) return QVariantList();
+    QVariantList out;QSqlQuery q(m_db.db());QString sql="SELECT id,name,email,role,account_status,blocked_reason,blocked_category,requires_password_reset FROM users WHERE deleted_at IS NULL";if(!role.isEmpty())sql+=" AND role=?";sql+=" ORDER BY name";q.prepare(sql);if(!role.isEmpty())q.addBindValue(role);q.exec();while(q.next()){QVariantMap m;QStringList k={"id","name","email","role","status","blockedReason","blockedCategory","requiresPasswordReset"};for(int i=0;i<k.size();i++)m[k[i]]=q.value(i);if(!can("users.manage")){m.remove("email");m.remove("status");m.remove("blockedReason");m.remove("blockedCategory");m.remove("requiresPasswordReset");}out<<m;}return out;
 }
 bool SchoolApp::createUser(const QVariantMap &v){
     if(!can("users.manage"))return false;
@@ -523,6 +539,7 @@ bool SchoolApp::deleteAnnouncement(int id){if(!can("communication.announcements"
 
 QVariantList SchoolApp::tardiness() const
 {
+    if (!((can("attendance.record")))) return QVariantList();
     QVariantList out;QSqlQuery q("SELECT t.id,t.student_id,s.last_name||' '||s.first_name,t.occurred_at,t.note FROM tardiness_records t JOIN students s ON s.id=t.student_id ORDER BY t.occurred_at DESC");while(q.next()){QVariantMap m;m["id"]=q.value(0);m["studentId"]=q.value(1);m["student"]=q.value(2);m["date"]=q.value(3);m["note"]=q.value(4);out<<m;}return out;
 }
 bool SchoolApp::addTardiness(const QVariantMap &v){if(!can("tardiness.record"))return false;return execute("INSERT INTO tardiness_records(student_id,recorded_by,occurred_at,note) VALUES(?,?,?,?)",{v["studentId"],m_userId,v["date"],v["note"]});}
@@ -536,6 +553,7 @@ bool SchoolApp::toggleExamPeriod(int id){if(!can("periods.manage"))return false;
 
 QVariantList SchoolApp::dashboard() const
 {
+    if (!((can("students.view") || can("balances.view")))) return QVariantList();
     QVariantList out;
     QSqlQuery q(m_db.db());
     q.exec("SELECT COUNT(*) FROM students WHERE deleted_at IS NULL AND graduated_at IS NULL");q.next();QVariantMap a;a["label"]="Élèves";a["value"]=q.value(0);out<<a;
@@ -725,6 +743,7 @@ QVariantMap SchoolApp::familyBulletin(int studentId, const QString &term) const
 
 QVariantMap SchoolApp::monthlyStats() const
 {
+    if (!((can("students.view") || can("balances.view")))) return QVariantMap();
     QVariantMap m;
     QSqlQuery p(m_db.db());
     if (p.exec("SELECT COALESCE(SUM(amount),0), COUNT(*) FROM payments "
@@ -749,6 +768,7 @@ QVariantMap SchoolApp::monthlyStats() const
 
 QString SchoolApp::setting(const QString &key) const
 {
+    if (key.startsWith("smtp_") && !can("email.config")) return QString();
     QSqlQuery q(m_db.db());
     q.prepare("SELECT value FROM settings WHERE key=?");
     q.addBindValue(key);
@@ -3217,4 +3237,17 @@ QVariantList SchoolApp::hrHistory(int limit) const
         out << m;
     }
     return out;
+}
+
+bool SchoolApp::financeVisible(int studentId) const
+{
+    return can("balances.view") || (canViewStudent(studentId) && !can("students.view"));
+}
+
+bool SchoolApp::isPaymentVisible(int paymentId) const
+{
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT student_id FROM payments WHERE id=?");
+    q.addBindValue(paymentId);
+    return q.exec() && q.next() && financeVisible(q.value(0).toInt());
 }
