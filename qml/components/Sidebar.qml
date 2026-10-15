@@ -58,6 +58,7 @@ Rectangle {
                 ["finextra", "Bourses, affectations et états", "📑"],
                 ["import", "Importation des données", "📥"],
                 ["email", "Rapports par e-mail", "✉"],
+                ["hr", "Ressources humaines", "👥"],
                 ["finance", "Paiements / factures", "💰"],
                 ["accounting", "Comptabilité", "🧾"],
                 ["communication", "Messages / annonces", "💬"],
