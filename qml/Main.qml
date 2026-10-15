@@ -5,10 +5,17 @@ import ESCATO
 import "components"
 import "pages"
 
+import QtQuick.Window
+
 ApplicationWindow {
     id: win
     width: 1440
     height: 900
+    minimumWidth: 900
+    minimumHeight: 600
+    visibility: Window.Maximized
+    onWidthChanged: sidebarOpen = width >= 1200
+    Component.onCompleted: sidebarOpen = width >= 1200
     visible: true
     title: "ESCATO — Gestion scolaire"
     color: "#F4F7FA"
@@ -70,10 +77,20 @@ ApplicationWindow {
                         Item { Layout.fillWidth: true }
                     }
 
-                    StackLayout {
-                        id: pages
+                    Flickable {
+                        id: hScroll
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        clip: true
+                        contentWidth: pages.width
+                        contentHeight: pages.height
+                        flickableDirection: Flickable.HorizontalFlick
+                        ScrollBar.horizontal: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                    StackLayout {
+                        id: pages
+                        width: Math.max(hScroll.width, 980)
+                        height: hScroll.height
                         currentIndex: {
                             var map={"dashboard":0,"students":1,"studentForm":2,"studentDetail":3,"teachers":4,"teacherForm":5,"courses":6,"exams":7,"finance":8,"accounting":9,"communication":10,"accounts":11,"bulletin":12,"settings":13,"audit":14,"fees":15,"roles":16,"curriculum":17,"attendance":18,"discipline":19,"council":20,"administration":21,"finreports":22,"treasury":23,"finextra":24,"import":25,"email":26,"hr":27}
                             return map[win.page]===undefined?0:map[win.page]
@@ -117,6 +134,7 @@ ApplicationWindow {
                         ImportPage {}
                         EmailPage {}
                         HrPage {}
+                    }
                     }
                 }
             }
