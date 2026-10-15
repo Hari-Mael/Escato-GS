@@ -67,11 +67,37 @@ ApplicationWindow {
                     RowLayout {
                         Layout.fillWidth: true
 
-                        AppButton {
-                            text: "☰"
-                            font.pixelSize: 18
-                            implicitWidth: 44
-                            onClicked: win.sidebarOpen = !win.sidebarOpen
+                        Item {
+                            implicitWidth: 40
+                            implicitHeight: 40
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 10
+                                color: menuArea.containsMouse ? "#E6F6F4" : "transparent"
+                            }
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 5
+                                Repeater {
+                                    model: 3
+                                    Rectangle {
+                                        width: 18
+                                        height: 2
+                                        radius: 1
+                                        color: "#0B7F74"
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: menuArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: win.sidebarOpen = !win.sidebarOpen
+                            }
                         }
 
                         Item { Layout.fillWidth: true }

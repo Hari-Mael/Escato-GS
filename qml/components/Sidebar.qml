@@ -33,12 +33,16 @@ Rectangle {
         anchors.margins: 16
         spacing: 6
 
-        Label {
-            text: "ESCATO GS"
-            color: "white"
-            font.pixelSize: 22
-            font.bold: true
+        Image {
+            id: logo
+            source: "qrc:/assets/logo.png"
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredHeight: 120
+            Layout.preferredWidth: 100
             Layout.bottomMargin: 10
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
         }
 
         ScrollView {
