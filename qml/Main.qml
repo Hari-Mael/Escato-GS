@@ -71,12 +71,6 @@ ApplicationWindow {
                             implicitWidth: 40
                             implicitHeight: 40
 
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 10
-                                color: menuArea.containsMouse ? "#E6F6F4" : "transparent"
-                            }
-
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 5
@@ -86,7 +80,7 @@ ApplicationWindow {
                                         width: 18
                                         height: 2
                                         radius: 1
-                                        color: "#0B7F74"
+                                        color: menuArea.containsMouse ? "#0F9D8F" : "#0B7F74"
                                     }
                                 }
                             }
