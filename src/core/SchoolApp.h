@@ -188,6 +188,29 @@ public:
     Q_INVOKABLE bool setActiveAcademicPeriod(int id);
     Q_INVOKABLE QVariantList auditLogs(int limit) const;
 
+    Q_INVOKABLE QVariantList hrDepartments() const;
+    Q_INVOKABLE bool addHrDepartment(const QString &name);
+    Q_INVOKABLE QVariantList hrPositions() const;
+    Q_INVOKABLE bool addHrPosition(const QString &name);
+    Q_INVOKABLE QVariantList hrEmployees() const;
+    Q_INVOKABLE bool addHrEmployee(const QVariantMap &v);
+    Q_INVOKABLE bool setHrEmployeeStatus(int id, const QString &status);
+    Q_INVOKABLE QVariantList hrAttendanceFor(const QString &day) const;
+    Q_INVOKABLE bool setHrAttendance(int employeeId, const QString &day, const QString &status);
+    Q_INVOKABLE QVariantList hrLeaves() const;
+    Q_INVOKABLE bool addHrLeave(const QVariantMap &v);
+    Q_INVOKABLE bool decideHrLeave(int id, bool approve);
+    Q_INVOKABLE QVariantList hrAdvances() const;
+    Q_INVOKABLE bool addHrAdvance(const QVariantMap &v);
+    Q_INVOKABLE QVariantList hrItems(const QString &period) const;
+    Q_INVOKABLE bool addHrItem(const QVariantMap &v);
+    Q_INVOKABLE QVariantMap hrSocialSettings() const;
+    Q_INVOKABLE bool saveHrSocialSettings(double employeeRate, double employerRate);
+    Q_INVOKABLE QVariantList hrPayrollPreview(const QString &period) const;
+    Q_INVOKABLE bool validateHrPayroll(const QString &period);
+    Q_INVOKABLE QVariantMap hrDashboard() const;
+    Q_INVOKABLE QVariantList hrHistory(int limit) const;
+
     Q_INVOKABLE QVariantMap smtpSettings() const;
     Q_INVOKABLE bool saveSmtpSettings(const QVariantMap &v);
     Q_INVOKABLE void setSmtpPassword(const QString &password);

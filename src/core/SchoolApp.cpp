@@ -2785,3 +2785,436 @@ void SchoolApp::runScheduledEmails()
     setSetting("email_last_run", today);
     sendOverdueReminders();
 }
+
+namespace {
+QDate hrPeriodEnd(const QString &period)
+{
+    const QDate first = QDate::fromString(period + "-01", "yyyy-MM-dd");
+    return first.isValid() ? first.addMonths(1).addDays(-1) : QDate();
+}
+}
+
+QVariantList SchoolApp::hrDepartments() const
+{
+    QVariantList out;
+    if (!can("hr.manage") && !can("hr.payroll")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name FROM hr_departments ORDER BY name")) return out;
+    while (q.next()) { QVariantMap m; m["id"] = q.value(0).toInt(); m["name"] = q.value(1).toString(); out << m; }
+    return out;
+}
+
+bool SchoolApp::addHrDepartment(const QString &name)
+{
+    if (!can("hr.manage")) return false;
+    const QString n = name.trimmed();
+    if (n.isEmpty()) { emit errorOccurred(QStringLiteral("Nom du service requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_departments(name) VALUES(?)");
+    q.addBindValue(n);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce service existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "hr_department", q.lastInsertId().toInt(), n);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::hrPositions() const
+{
+    QVariantList out;
+    if (!can("hr.manage") && !can("hr.payroll")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT id,name FROM hr_positions ORDER BY name")) return out;
+    while (q.next()) { QVariantMap m; m["id"] = q.value(0).toInt(); m["name"] = q.value(1).toString(); out << m; }
+    return out;
+}
+
+bool SchoolApp::addHrPosition(const QString &name)
+{
+    if (!can("hr.manage")) return false;
+    const QString n = name.trimmed();
+    if (n.isEmpty()) { emit errorOccurred(QStringLiteral("Nom du poste requis.")); return false; }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_positions(name) VALUES(?)");
+    q.addBindValue(n);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Ce poste existe déjà.") : q.lastError().text()); return false; }
+    audit("create", "hr_position", q.lastInsertId().toInt(), n);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::hrEmployees() const
+{
+    QVariantList out;
+    if (!can("hr.manage") && !can("hr.payroll")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT e.id,e.full_name,COALESCE(e.phone,''),COALESCE(d.name,''),COALESCE(p.name,''),COALESCE(e.contract_type,''),"
+                "COALESCE(e.start_date,''),e.base_salary,e.status FROM hr_employees e "
+                "LEFT JOIN hr_departments d ON d.id=e.department_id LEFT JOIN hr_positions p ON p.id=e.position_id ORDER BY e.full_name")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["phone"] = q.value(2).toString();
+        m["department"] = q.value(3).toString();
+        m["position"] = q.value(4).toString();
+        m["contract"] = q.value(5).toString();
+        m["startDate"] = q.value(6).toString();
+        m["baseSalary"] = q.value(7).toDouble();
+        m["status"] = q.value(8).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addHrEmployee(const QVariantMap &v)
+{
+    if (!can("hr.manage")) return false;
+    const QString name = v.value("name").toString().trimmed();
+    const double base = v.value("baseSalary").toDouble();
+    const QString start = v.value("startDate").toString().trimmed();
+    if (name.isEmpty() || base < 0 || (!start.isEmpty() && !QDate::fromString(start, "yyyy-MM-dd").isValid())) {
+        emit errorOccurred(QStringLiteral("Nom, salaire de base (≥ 0) et date de début (AAAA-MM-JJ) valides requis."));
+        return false;
+    }
+    const int dep = v.value("departmentId").toInt();
+    const int pos = v.value("positionId").toInt();
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_employees(full_name,phone,department_id,position_id,contract_type,start_date,base_salary) VALUES(?,?,?,?,?,?,?)");
+    q.addBindValue(name);
+    q.addBindValue(v.value("phone").toString().trimmed());
+    q.addBindValue(dep > 0 ? QVariant(dep) : QVariant());
+    q.addBindValue(pos > 0 ? QVariant(pos) : QVariant());
+    q.addBindValue(v.value("contractType").toString().trimmed());
+    q.addBindValue(start.isEmpty() ? QVariant() : QVariant(start));
+    q.addBindValue(base);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "hr_employee", q.lastInsertId().toInt(), name);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::setHrEmployeeStatus(int id, const QString &status)
+{
+    if (!can("hr.manage")) return false;
+    if (!QStringList({"actif", "sorti"}).contains(status)) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE hr_employees SET status=? WHERE id=?");
+    q.addBindValue(status);
+    q.addBindValue(id);
+    if (!q.exec() || q.numRowsAffected() != 1) return false;
+    audit("update", "hr_employee", id, status);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::hrAttendanceFor(const QString &day) const
+{
+    QVariantList out;
+    if (!can("hr.manage")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT e.id,e.full_name,COALESCE(a.status,'present') FROM hr_employees e "
+              "LEFT JOIN hr_attendance a ON a.employee_id=e.id AND a.day=? WHERE e.status='actif' ORDER BY e.full_name");
+    q.addBindValue(day.trimmed());
+    if (!q.exec()) return out;
+    while (q.next()) { QVariantMap m; m["id"] = q.value(0).toInt(); m["name"] = q.value(1).toString(); m["status"] = q.value(2).toString(); out << m; }
+    return out;
+}
+
+bool SchoolApp::setHrAttendance(int employeeId, const QString &day, const QString &status)
+{
+    if (!can("hr.manage")) return false;
+    if (!QDate::fromString(day, "yyyy-MM-dd").isValid() || !QStringList({"present", "absent", "late", "leave"}).contains(status)) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_attendance(employee_id,day,status) VALUES(?,?,?) ON CONFLICT(employee_id,day) DO UPDATE SET status=excluded.status");
+    q.addBindValue(employeeId);
+    q.addBindValue(day);
+    q.addBindValue(status);
+    if (!q.exec()) return false;
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::hrLeaves() const
+{
+    QVariantList out;
+    if (!can("hr.manage")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT l.id,e.full_name,l.kind,l.start_date,l.end_date,l.status FROM hr_leaves l "
+                "JOIN hr_employees e ON e.id=l.employee_id ORDER BY l.id DESC LIMIT 200")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["kind"] = q.value(2).toString();
+        m["startDate"] = q.value(3).toString();
+        m["endDate"] = q.value(4).toString();
+        m["status"] = q.value(5).toString();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addHrLeave(const QVariantMap &v)
+{
+    if (!can("hr.manage")) return false;
+    const QDate s = QDate::fromString(v.value("startDate").toString(), "yyyy-MM-dd");
+    const QDate e = QDate::fromString(v.value("endDate").toString(), "yyyy-MM-dd");
+    const QString kind = v.value("kind").toString().trimmed();
+    if (v.value("employeeId").toInt() <= 0 || kind.isEmpty() || !s.isValid() || !e.isValid() || e < s) {
+        emit errorOccurred(QStringLiteral("Salarié, type et dates valides (AAAA-MM-JJ, fin après début) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_leaves(employee_id,kind,start_date,end_date) VALUES(?,?,?,?)");
+    q.addBindValue(v.value("employeeId").toInt());
+    q.addBindValue(kind);
+    q.addBindValue(s.toString("yyyy-MM-dd"));
+    q.addBindValue(e.toString("yyyy-MM-dd"));
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "hr_leave", q.lastInsertId().toInt(), kind);
+    emit dataChanged();
+    return true;
+}
+
+bool SchoolApp::decideHrLeave(int id, bool approve)
+{
+    if (!can("hr.manage")) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE hr_leaves SET status=? WHERE id=? AND status='en attente'");
+    q.addBindValue(approve ? QStringLiteral("approuvé") : QStringLiteral("refusé"));
+    q.addBindValue(id);
+    if (!q.exec() || q.numRowsAffected() != 1) return false;
+    audit(approve ? "approve" : "refuse", "hr_leave", id);
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::hrAdvances() const
+{
+    QVariantList out;
+    if (!can("hr.payroll")) return out;
+    QSqlQuery q(m_db.db());
+    if (!q.exec("SELECT a.id,e.full_name,a.advance_date,a.amount,a.deducted FROM hr_advances a "
+                "JOIN hr_employees e ON e.id=a.employee_id ORDER BY a.id DESC LIMIT 200")) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["date"] = q.value(2).toString();
+        m["amount"] = q.value(3).toDouble();
+        m["deducted"] = q.value(4).toInt() == 1;
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addHrAdvance(const QVariantMap &v)
+{
+    if (!can("hr.payroll")) return false;
+    const QDate d = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const double amount = v.value("amount").toDouble();
+    if (v.value("employeeId").toInt() <= 0 || !d.isValid() || amount <= 0) {
+        emit errorOccurred(QStringLiteral("Salarié, date et montant (> 0) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_advances(employee_id,advance_date,amount) VALUES(?,?,?)");
+    q.addBindValue(v.value("employeeId").toInt());
+    q.addBindValue(d.toString("yyyy-MM-dd"));
+    q.addBindValue(amount);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "hr_advance", q.lastInsertId().toInt(), QString::number(amount, 'f', 0));
+    emit dataChanged();
+    return true;
+}
+
+QVariantList SchoolApp::hrItems(const QString &period) const
+{
+    QVariantList out;
+    if (!can("hr.payroll")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT i.id,e.full_name,i.kind,i.label,i.amount FROM hr_items i JOIN hr_employees e ON e.id=i.employee_id "
+              "WHERE i.period=? ORDER BY e.full_name");
+    q.addBindValue(period.trimmed());
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["id"] = q.value(0).toInt();
+        m["name"] = q.value(1).toString();
+        m["kind"] = q.value(2).toString();
+        m["label"] = q.value(3).toString();
+        m["amount"] = q.value(4).toDouble();
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::addHrItem(const QVariantMap &v)
+{
+    if (!can("hr.payroll")) return false;
+    const QString period = v.value("period").toString().trimmed();
+    const QString kind = v.value("kind").toString();
+    const QString label = v.value("label").toString().trimmed();
+    const double amount = v.value("amount").toDouble();
+    if (v.value("employeeId").toInt() <= 0 || !hrPeriodEnd(period).isValid() || !QStringList({"prime", "retenue"}).contains(kind)
+        || label.isEmpty() || amount <= 0) {
+        emit errorOccurred(QStringLiteral("Salarié, période (AAAA-MM), type, libellé et montant (> 0) requis."));
+        return false;
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("INSERT INTO hr_items(employee_id,period,kind,label,amount) VALUES(?,?,?,?,?)");
+    q.addBindValue(v.value("employeeId").toInt());
+    q.addBindValue(period);
+    q.addBindValue(kind);
+    q.addBindValue(label);
+    q.addBindValue(amount);
+    if (!q.exec()) { emit errorOccurred(q.lastError().text()); return false; }
+    audit("create", "hr_item", q.lastInsertId().toInt(), kind + " " + label);
+    emit dataChanged();
+    return true;
+}
+
+QVariantMap SchoolApp::hrSocialSettings() const
+{
+    QVariantMap out;
+    if (!can("hr.payroll")) return out;
+    out["employeeRate"] = setting("hr_employee_rate").isEmpty() ? 0.0 : setting("hr_employee_rate").toDouble();
+    out["employerRate"] = setting("hr_employer_rate").isEmpty() ? 0.0 : setting("hr_employer_rate").toDouble();
+    return out;
+}
+
+bool SchoolApp::saveHrSocialSettings(double employeeRate, double employerRate)
+{
+    if (!can("hr.payroll")) return false;
+    if (employeeRate < 0 || employeeRate > 100 || employerRate < 0 || employerRate > 100) {
+        emit errorOccurred(QStringLiteral("Taux entre 0 et 100 %."));
+        return false;
+    }
+    setSetting("hr_employee_rate", QString::number(employeeRate));
+    setSetting("hr_employer_rate", QString::number(employerRate));
+    return true;
+}
+
+QVariantList SchoolApp::hrPayrollPreview(const QString &period) const
+{
+    QVariantList out;
+    if (!can("hr.payroll")) return out;
+    const QDate end = hrPeriodEnd(period.trimmed());
+    if (!end.isValid()) return out;
+    const double empRate = setting("hr_employee_rate").isEmpty() ? 0.0 : setting("hr_employee_rate").toDouble();
+    const double erRate = setting("hr_employer_rate").isEmpty() ? 0.0 : setting("hr_employer_rate").toDouble();
+    const QString p = period.trimmed();
+    QSqlQuery emps(m_db.db());
+    if (!emps.exec("SELECT id,full_name,base_salary FROM hr_employees WHERE status='actif' ORDER BY full_name")) return out;
+    while (emps.next()) {
+        const int eid = emps.value(0).toInt();
+        const double base = emps.value(2).toDouble();
+        QSqlQuery it(m_db.db());
+        it.prepare("SELECT COALESCE(SUM(CASE WHEN kind='prime' THEN amount ELSE 0 END),0), COALESCE(SUM(CASE WHEN kind='retenue' THEN amount ELSE 0 END),0) "
+                   "FROM hr_items WHERE employee_id=? AND period=?");
+        it.addBindValue(eid);
+        it.addBindValue(p);
+        double primes = 0, retenues = 0;
+        if (it.exec() && it.next()) { primes = it.value(0).toDouble(); retenues = it.value(1).toDouble(); }
+        QSqlQuery adv(m_db.db());
+        adv.prepare("SELECT COALESCE(SUM(amount),0) FROM hr_advances WHERE employee_id=? AND deducted=0 AND advance_date<=?");
+        adv.addBindValue(eid);
+        adv.addBindValue(end.toString("yyyy-MM-dd"));
+        const double advances = adv.exec() && adv.next() ? adv.value(0).toDouble() : 0.0;
+        const double gross = base + primes - retenues;
+        const double social = gross * empRate / 100.0;
+        QVariantMap m;
+        m["employeeId"] = eid;
+        m["name"] = emps.value(1).toString();
+        m["base"] = base;
+        m["primes"] = primes;
+        m["retenues"] = retenues;
+        m["gross"] = gross;
+        m["social"] = social;
+        m["advances"] = advances;
+        m["net"] = gross - social - advances;
+        m["employerCost"] = gross * (1.0 + erRate / 100.0);
+        out << m;
+    }
+    return out;
+}
+
+bool SchoolApp::validateHrPayroll(const QString &period)
+{
+    if (!can("hr.payroll")) return false;
+    const QString p = period.trimmed();
+    const QDate end = hrPeriodEnd(p);
+    if (!end.isValid()) { emit errorOccurred(QStringLiteral("Période au format AAAA-MM requise.")); return false; }
+    QSqlQuery exists(m_db.db());
+    exists.prepare("SELECT COUNT(*) FROM payroll_runs WHERE period=?");
+    exists.addBindValue(p);
+    if (exists.exec() && exists.next() && exists.value(0).toInt() > 0) {
+        emit errorOccurred(QStringLiteral("La paie de cette période est déjà validée."));
+        return false;
+    }
+    const QVariantList rows = hrPayrollPreview(p);
+    QSqlDatabase db = m_db.db();
+    if (!db.transaction()) return false;
+    for (const QVariant &v : rows) {
+        const QVariantMap m = v.toMap();
+        QSqlQuery ins(db);
+        ins.prepare("INSERT INTO payroll_runs(period,employee_id,gross,social,advances,net,employer_cost) VALUES(?,?,?,?,?,?,?)");
+        ins.addBindValue(p);
+        ins.addBindValue(m["employeeId"].toInt());
+        ins.addBindValue(m["gross"].toDouble());
+        ins.addBindValue(m["social"].toDouble());
+        ins.addBindValue(m["advances"].toDouble());
+        ins.addBindValue(m["net"].toDouble());
+        ins.addBindValue(m["employerCost"].toDouble());
+        if (!ins.exec()) { db.rollback(); emit errorOccurred(ins.lastError().text()); return false; }
+        QSqlQuery ded(db);
+        ded.prepare("UPDATE hr_advances SET deducted=1 WHERE employee_id=? AND deducted=0 AND advance_date<=?");
+        ded.addBindValue(m["employeeId"].toInt());
+        ded.addBindValue(end.toString("yyyy-MM-dd"));
+        if (!ded.exec()) { db.rollback(); return false; }
+    }
+    db.commit();
+    audit("validate", "hr_payroll", 0, p + " (" + QString::number(rows.size()) + " salariés)");
+    emit dataChanged();
+    return true;
+}
+
+QVariantMap SchoolApp::hrDashboard() const
+{
+    QVariantMap out;
+    if (!can("hr.manage") && !can("hr.payroll")) return out;
+    QSqlQuery a(m_db.db());
+    a.exec("SELECT COUNT(*) FROM hr_employees WHERE status='actif'");
+    out["activeEmployees"] = a.next() ? a.value(0).toInt() : 0;
+    QSqlQuery l(m_db.db());
+    l.exec("SELECT COUNT(*) FROM hr_leaves WHERE status='en attente'");
+    out["pendingLeaves"] = l.next() ? l.value(0).toInt() : 0;
+    QSqlQuery pr(m_db.db());
+    pr.prepare("SELECT COUNT(*) FROM hr_attendance WHERE day=? AND status IN ('present','late')");
+    pr.addBindValue(QDate::currentDate().toString("yyyy-MM-dd"));
+    out["presentToday"] = pr.exec() && pr.next() ? pr.value(0).toInt() : 0;
+    QSqlQuery vp(m_db.db());
+    vp.exec("SELECT COUNT(DISTINCT period) FROM payroll_runs");
+    out["validatedPeriods"] = vp.next() ? vp.value(0).toInt() : 0;
+    return out;
+}
+
+QVariantList SchoolApp::hrHistory(int limit) const
+{
+    QVariantList out;
+    if (!can("hr.manage") && !can("hr.payroll")) return out;
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT a.created_at,COALESCE(u.name,'Système'),a.action,a.details FROM audit_logs a "
+              "LEFT JOIN users u ON u.id=a.user_id WHERE a.entity LIKE 'hr_%' ORDER BY a.id DESC LIMIT ?");
+    q.addBindValue(limit > 0 ? limit : 200);
+    if (!q.exec()) return out;
+    while (q.next()) {
+        QVariantMap m;
+        m["createdAt"] = q.value(0).toString();
+        m["user"] = q.value(1).toString();
+        m["action"] = q.value(2).toString();
+        m["details"] = q.value(3).toString();
+        out << m;
+    }
+    return out;
+}

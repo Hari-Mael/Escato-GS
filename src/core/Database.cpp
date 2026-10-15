@@ -393,6 +393,74 @@ bool Database::createSchema()
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         ))",
 
+        R"(CREATE TABLE IF NOT EXISTS hr_departments(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS hr_positions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS hr_employees(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            phone TEXT,
+            department_id INTEGER REFERENCES hr_departments(id) ON DELETE SET NULL,
+            position_id INTEGER REFERENCES hr_positions(id) ON DELETE SET NULL,
+            contract_type TEXT,
+            start_date TEXT,
+            base_salary REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'actif' CHECK(status IN ('actif','sorti'))
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS hr_attendance(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL REFERENCES hr_employees(id) ON DELETE CASCADE,
+            day TEXT NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('present','absent','late','leave')),
+            UNIQUE(employee_id, day)
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS hr_leaves(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL REFERENCES hr_employees(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'en attente'
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS hr_advances(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL REFERENCES hr_employees(id) ON DELETE CASCADE,
+            advance_date TEXT NOT NULL,
+            amount REAL NOT NULL,
+            deducted INTEGER NOT NULL DEFAULT 0
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS hr_items(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id INTEGER NOT NULL REFERENCES hr_employees(id) ON DELETE CASCADE,
+            period TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK(kind IN ('prime','retenue')),
+            label TEXT NOT NULL,
+            amount REAL NOT NULL
+        ))",
+
+        R"(CREATE TABLE IF NOT EXISTS payroll_runs(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period TEXT NOT NULL,
+            employee_id INTEGER NOT NULL REFERENCES hr_employees(id) ON DELETE CASCADE,
+            gross REAL NOT NULL,
+            social REAL NOT NULL,
+            advances REAL NOT NULL,
+            net REAL NOT NULL,
+            employer_cost REAL NOT NULL,
+            UNIQUE(period, employee_id)
+        ))",
+
         R"(CREATE TABLE IF NOT EXISTS teacher_profiles(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
@@ -657,6 +725,11 @@ bool Database::migrate()
 
 bool Database::seed()
 {
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('hr.manage','Gérer les salariés, présences et congés','Ressources humaines')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','hr.manage',1),('enseignant','hr.manage',0),('eleve','hr.manage',0),('parent','hr.manage',0),('comptable','hr.manage',0)")) return false;
+    if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('hr.payroll','Gérer avances, primes, retenues et paie','Ressources humaines')")) return false;
+    if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','hr.payroll',1),('enseignant','hr.payroll',0),('eleve','hr.payroll',0),('parent','hr.payroll',0),('comptable','hr.payroll',1)")) return false;
+
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('email.config','Configurer le serveur d''envoi et la planification','Communication')")) return false;
     if (!exec("INSERT OR IGNORE INTO role_permissions(role,permission,allowed) VALUES ('administrateur','email.config',1),('enseignant','email.config',0),('eleve','email.config',0),('parent','email.config',0),('comptable','email.config',0)")) return false;
     if (!exec("INSERT OR IGNORE INTO permissions_catalog(key,label,grp) VALUES('email.send','Envoyer des e-mails (relances, situations, tests)','Communication')")) return false;
