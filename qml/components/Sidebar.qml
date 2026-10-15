@@ -38,46 +38,58 @@ Rectangle {
             color: "white"
             font.pixelSize: 22
             font.bold: true
-            Layout.bottomMargin: 18
+            Layout.bottomMargin: 10
         }
 
-        Repeater {
-            model: [
-                ["dashboard", "Tableau de bord", "⌂"],
-                ["students", "Élèves", "👨‍🎓"],
-                ["teachers", "Enseignants", "👨‍🏫"],
-                ["courses", "Cours", "📚"],
-                ["exams", "Examens & notes", "📝"],
-                ["curriculum", "Matières & emploi du temps", "📐"],
-                ["attendance", "Présences", "✅"],
-                ["discipline", "Discipline", "⚠"],
-                ["council", "Délibérations", "🎓"],
-                ["administration", "Administration scolaire", "🏛"],
-                ["finreports", "Rapports financiers", "📊"],
-                ["treasury", "Caisse, banque et clôtures", "🏦"],
-                ["finextra", "Bourses, affectations et états", "📑"],
-                ["import", "Importation des données", "📥"],
-                ["email", "Rapports par e-mail", "✉"],
-                ["hr", "Ressources humaines", "👥"],
-                ["finance", "Paiements / factures", "💰"],
-                ["accounting", "Comptabilité", "🧾"],
-                ["communication", "Messages / annonces", "💬"],
-                ["accounts", "Comptes / sécurité", "🔐"],
-                ["bulletin", "Bulletins", "📄"],
-                ["audit", "Journal d'audit", "📜"],
-                ["fees", "Frais et soldes", "🏷"],
-                ["roles", "Rôles et permissions", "🛡"]
-            ]
-            delegate: AppButton {
-                Layout.fillWidth: true
-                text: modelData[2] + "  " + modelData[1]
-                visible: root.pageAllowed(modelData[0])
-                highlighted: root.currentPage === modelData[0]
-                onClicked: root.navigate(modelData[0])
+        ScrollView {
+            id: menuScroll
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+            ColumnLayout {
+                width: menuScroll.availableWidth
+                spacing: 6
+
+                Repeater {
+                    model: [
+                        ["dashboard", "Tableau de bord", "⌂"],
+                        ["students", "Élèves", "👨‍🎓"],
+                        ["teachers", "Enseignants", "👨‍🏫"],
+                        ["courses", "Cours", "📚"],
+                        ["exams", "Examens & notes", "📝"],
+                        ["curriculum", "Matières & emploi du temps", "📐"],
+                        ["attendance", "Présences", "✅"],
+                        ["discipline", "Discipline", "⚠"],
+                        ["council", "Délibérations", "🎓"],
+                        ["administration", "Administration scolaire", "🏛"],
+                        ["finreports", "Rapports financiers", "📊"],
+                        ["treasury", "Caisse, banque et clôtures", "🏦"],
+                        ["finextra", "Bourses, affectations et états", "📑"],
+                        ["import", "Importation des données", "📥"],
+                        ["email", "Rapports par e-mail", "✉"],
+                        ["hr", "Ressources humaines", "👥"],
+                        ["finance", "Paiements / factures", "💰"],
+                        ["accounting", "Comptabilité", "🧾"],
+                        ["communication", "Messages / annonces", "💬"],
+                        ["accounts", "Comptes / sécurité", "🔐"],
+                        ["bulletin", "Bulletins", "📄"],
+                        ["audit", "Journal d'audit", "📜"],
+                        ["fees", "Frais et soldes", "🏷"],
+                        ["roles", "Rôles et permissions", "🛡"]
+                    ]
+                    delegate: AppButton {
+                        Layout.fillWidth: true
+                        text: modelData[2] + "  " + modelData[1]
+                        visible: root.pageAllowed(modelData[0])
+                        highlighted: root.currentPage === modelData[0]
+                        onClicked: root.navigate(modelData[0])
+                    }
+                }
             }
         }
-
-        Item { Layout.fillHeight: true }
 
         Rectangle {
             Layout.fillWidth: true
