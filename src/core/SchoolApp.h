@@ -270,6 +270,15 @@ private:
     QString m_role;
 
     bool canViewStudent(int studentId) const;
+    bool financeVisible(int studentId) const;
+
+public:
+    bool isStudentVisible(int studentId) const { return canViewStudent(studentId); }
+    bool isFinanceVisible(int studentId) const { return financeVisible(studentId); }
+    bool isPaymentVisible(int paymentId) const;
+    bool hasPermission(const QString &permission) const { return can(permission); }
+
+private:
 
     bool allowed(const QStringList &roles) const;
     double oneTimeBilled(int studentId, const QString &from, const QString &to) const;
