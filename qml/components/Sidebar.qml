@@ -87,30 +87,30 @@ Rectangle {
 
                 Repeater {
                     model: [
-                        ["dashboard", "Tableau de bord"],
-                        ["students", "Élèves"],
-                        ["teachers", "Enseignants"],
-                        ["courses", "Cours"],
-                        ["exams", "Examens & notes"],
-                        ["curriculum", "Matières & emploi du temps"],
-                        ["attendance", "Présences"],
-                        ["discipline", "Discipline"],
-                        ["council", "Délibérations"],
-                        ["administration", "Administration scolaire"],
-                        ["finreports", "Rapports financiers"],
-                        ["treasury", "Caisse, banque et clôtures"],
-                        ["finextra", "Bourses, affectations et états"],
-                        ["import", "Importation des données"],
-                        ["email", "Rapports par e-mail"],
-                        ["hr", "Ressources humaines"],
-                        ["finance", "Paiements / factures"],
-                        ["accounting", "Comptabilité"],
-                        ["communication", "Messages / annonces"],
-                        ["accounts", "Comptes / sécurité"],
-                        ["bulletin", "Bulletins"],
-                        ["audit", "Journal d'audit"],
-                        ["fees", "Frais et soldes"],
-                        ["roles", "Rôles et permissions"]
+                        ["dashboard", "Tableau de bord", "dashboard"],
+                        ["students", "Élèves", "school"],
+                        ["teachers", "Enseignants", "person_book"],
+                        ["courses", "Cours", "menu_book"],
+                        ["exams", "Examens & notes", "edit_note"],
+                        ["curriculum", "Matières & emploi du temps", "calendar_month"],
+                        ["attendance", "Présences", "fact_check"],
+                        ["discipline", "Discipline", "gavel"],
+                        ["council", "Délibérations", "workspace_premium"],
+                        ["administration", "Administration scolaire", "account_balance"],
+                        ["finreports", "Rapports financiers", "bar_chart"],
+                        ["treasury", "Caisse, banque et clôtures", "account_balance_wallet"],
+                        ["finextra", "Bourses, affectations et états", "request_quote"],
+                        ["import", "Importation des données", "upload_file"],
+                        ["email", "Rapports par e-mail", "mail"],
+                        ["hr", "Ressources humaines", "groups"],
+                        ["finance", "Paiements / factures", "payments"],
+                        ["accounting", "Comptabilité", "receipt_long"],
+                        ["communication", "Messages / annonces", "campaign"],
+                        ["accounts", "Comptes / sécurité", "lock"],
+                        ["bulletin", "Bulletins", "description"],
+                        ["audit", "Journal d'audit", "history"],
+                        ["fees", "Frais et soldes", "sell"],
+                        ["roles", "Rôles et permissions", "admin_panel_settings"]
                     ]
                     delegate: Rectangle {
                         id: entry
@@ -146,10 +146,10 @@ Rectangle {
                                 color: entry.active ? "#0F9D8F" : "#173F5F"
                                 Text {
                                     anchors.centerIn: parent
-                                    text: root.initials(entry.modelData[1])
+                                    text: entry.modelData[2]
                                     color: "white"
-                                    font.pixelSize: 10
-                                    font.bold: true
+                                    font.family: "Material Symbols Rounded"
+                                    font.pixelSize: 17
                                 }
                             }
 
@@ -231,9 +231,10 @@ Rectangle {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 Text {
                     anchors.centerIn: parent
-                    text: "⚙"
+                    text: "settings"
                     color: "#C9DCEB"
-                    font.pixelSize: 18
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 22
                 }
                 MouseArea {
                     id: settingsArea
@@ -256,9 +257,10 @@ Rectangle {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 Text {
                     anchors.centerIn: parent
-                    text: "⏻"
+                    text: "logout"
                     color: logoutArea.containsMouse ? "#FFB4B4" : "#C9DCEB"
-                    font.pixelSize: 17
+                    font.family: "Material Symbols Rounded"
+                    font.pixelSize: 20
                 }
                 MouseArea {
                     id: logoutArea
