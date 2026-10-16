@@ -95,6 +95,11 @@ public:
     Q_INVOKABLE bool addStudent(const QVariantMap &v);
     Q_INVOKABLE QVariantMap importStudentsCsv(const QString &csv);
     Q_INVOKABLE QString studentsCsvTemplate() const;
+    Q_INVOKABLE QString importPhoto(const QString &fileUrl) const;
+    Q_INVOKABLE QString photoUrl(const QString &path) const;
+    Q_INVOKABLE QString myPhoto() const;
+    Q_INVOKABLE bool setMyPhoto(const QString &path);
+    Q_INVOKABLE QString studentPhotoPath(int studentId) const;
     Q_INVOKABLE bool updateStudent(int id, const QVariantMap &v);
     Q_INVOKABLE bool deleteStudent(int id);
     Q_INVOKABLE bool graduateStudent(int id);

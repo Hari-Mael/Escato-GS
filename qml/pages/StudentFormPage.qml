@@ -6,6 +6,7 @@ import "../components"
 Item {
     signal saved()
     property int editingId: 0
+    onEditingIdChanged: photoPicker.path = editingId ? school.studentPhotoPath(editingId) : ""
 
     ColumnLayout {
         anchors.fill: parent; spacing: 16
@@ -18,6 +19,7 @@ Item {
         ScrollView {
             Layout.fillWidth:true; Layout.fillHeight:true
             GridLayout {
+                PhotoPicker { id: photoPicker; Layout.columnSpan: 2 }
                 width: parent.width; columns:2; columnSpacing:20; rowSpacing:14
 
                 Label{text:"Matricule"} AppTextField{id: matricule; placeholderText:"Laisser vide pour génération automatique"; Layout.fillWidth:true}
@@ -58,7 +60,7 @@ Item {
             motherName:mother.text, motherJob:motherJob.text, parentPhone:parentPhone.text,
             parentEmail:parentEmail.text, address:address.text, previousSchool:previousSchool.text,
             previousClass:previousClass.text, className:classBox.currentText,
-            desiredCareer:career.text, photo:"", entryDate:entryDate.text,
+            desiredCareer:career.text, photo:photoPicker.path, entryDate:entryDate.text,
             matricule:matricule.text.trim()
         }
     }
@@ -82,6 +84,7 @@ Item {
     }
 
     function reset() {
+        photoPicker.path = ""
         [matricule, lastName, firstName, birthDate, birthPlace, father, fatherJob, mother, motherJob,
          parentPhone, parentEmail, address, previousSchool, previousClass, entryDate, career].forEach(function(f){ f.text = "" })
         classBox.currentIndex = 0

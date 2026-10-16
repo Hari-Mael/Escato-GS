@@ -12,10 +12,12 @@ Rectangle {
     }
 
     property string currentPage: "dashboard"
+    property string myPhotoUrl: ""
     signal navigate(string page)
 
     property var perms: ({})
     function refreshPerms() {
+        myPhotoUrl = school.photoUrl(school.myPhoto())
         perms = {
             "audit": school.can("audit.view"),
             "fees": school.can("balances.view"),
@@ -36,6 +38,28 @@ Rectangle {
         target: school
         function onDataChanged() { root.refreshPerms() }
         function onSessionChanged() { root.refreshPerms() }
+    }
+
+    Popup {
+        id: profilePopup
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        width: 360
+        padding: 24
+        background: Rectangle { radius: 14; color: "white" }
+
+        ColumnLayout {
+            spacing: 14
+            Label { text: "Ma photo de profil"; font.pixelSize: 18; font.bold: true }
+            PhotoPicker {
+                id: myPicker
+                size: 140
+                path: school.myPhoto()
+                onPhotoChanged: function(newPath) { school.setMyPhoto(newPath) }
+            }
+            AppButton { text: "Fermer"; Layout.alignment: Qt.AlignRight; onClicked: profilePopup.close() }
+        }
     }
 
     ColumnLayout {
@@ -190,11 +214,27 @@ Rectangle {
             Rectangle {
                 Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
-                radius: 18
+                radius: 10
                 color: "#0F9D8F"
+                clip: true
+
+                Image {
+                    anchors.fill: parent
+                    source: root.myPhotoUrl
+                    visible: root.myPhotoUrl !== ""
+                    fillMode: Image.PreserveAspectCrop
+                    smooth: true
+                    mipmap: true
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: profilePopup.open()
+                }
                 Text {
                     anchors.centerIn: parent
                     text: root.initials(school.currentUser)
+                    visible: root.myPhotoUrl === ""
                     color: "white"
                     font.bold: true
                     font.pixelSize: 12
