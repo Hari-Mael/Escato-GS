@@ -8,6 +8,7 @@ Item{
         RowLayout{Label{text:"Nouvel enseignant";font.pixelSize:28;font.bold:true}Item{Layout.fillWidth:true}AppButton{text:"← Retour";onClicked:saved()}}
         ScrollView{Layout.fillWidth:true;Layout.fillHeight:true
             GridLayout{width:parent.width;columns:2;columnSpacing:18;rowSpacing:12
+                PhotoPicker{id:photoPicker;Layout.columnSpan:2}
                 Label{text:"Nom *"}AppTextField{id:name;Layout.fillWidth:true}
                 Label{text:"E-mail *"}AppTextField{id:email;Layout.fillWidth:true}
                 Label{text:"Mot de passe * (8 car. min.)"}AppTextField{id:password;echoMode:TextInput.Password;Layout.fillWidth:true}
@@ -37,9 +38,9 @@ Item{
         if(!name.text||!email.text||!cin.text||!contact.text||!subject.text||password.text.length<8){formError.text="Merci de remplir les champs marqués d'un * (mot de passe : 8 caractères minimum).";return}
         if(school.addTeacher(formData())){reset();saved()}
     }
-    function reset(){
+    function reset(){photoPicker.path="";
         [name,email,password,cin,cnaps,mle,contact,address,dob,birthPlace,maritalStatus,religion,subject,occupation,hiringDate,contractEndDate,comment].forEach(function(f){f.text=""})
         childCount.value=0;employmentType.currentIndex=0;formError.text=""
     }
-    function formData(){return{name:name.text,email:email.text,password:password.text,cin:cin.text,cnaps:cnaps.text,mle:mle.text,contact:contact.text,address:address.text,dob:dob.text,birthPlace:birthPlace.text,children:childCount.value,maritalStatus:maritalStatus.text,religion:religion.text,subject:subject.text,occupation:occupation.text,employmentType:employmentType.currentText,hiringDate:hiringDate.text,contractEndDate:contractEndDate.text,comment:comment.text,photo:""}}
+    function formData(){return{name:name.text,email:email.text,password:password.text,cin:cin.text,cnaps:cnaps.text,mle:mle.text,contact:contact.text,address:address.text,dob:dob.text,birthPlace:birthPlace.text,children:childCount.value,maritalStatus:maritalStatus.text,religion:religion.text,subject:subject.text,occupation:occupation.text,employmentType:employmentType.currentText,hiringDate:hiringDate.text,contractEndDate:contractEndDate.text,comment:comment.text,photo:photoPicker.path}}
 }

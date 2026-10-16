@@ -16,6 +16,12 @@
 #include <QTimer>
 #include <QTime>
 #include <QSet>
+#include <QStandardPaths>
+#include <QDir>
+#include <QUuid>
+#include <QUrl>
+#include <QFile>
+#include <QImage>
 
 static constexpr int kMinPasswordLength = 8;
 
@@ -3250,4 +3256,57 @@ bool SchoolApp::isPaymentVisible(int paymentId) const
     q.prepare("SELECT student_id FROM payments WHERE id=?");
     q.addBindValue(paymentId);
     return q.exec() && q.next() && financeVisible(q.value(0).toInt());
+}
+
+QString SchoolApp::importPhoto(const QString &fileUrl) const
+{
+    if (m_userId <= 0) return QString();
+    const QUrl url(fileUrl);
+    const QString local = url.isLocalFile() ? url.toLocalFile() : fileUrl;
+    QImage img(local);
+    if (img.isNull()) return QString();
+    if (img.width() > 400 || img.height() > 400)
+        img = img.scaled(400, 400, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+    const QString dirPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + QStringLiteral("/photos");
+    QDir().mkpath(dirPath);
+    const QString target = dirPath + QStringLiteral("/") + QUuid::createUuid().toString(QUuid::WithoutBraces) + QStringLiteral(".jpg");
+    if (!img.save(target, "JPG", 85)) return QString();
+    return target;
+}
+
+QString SchoolApp::photoUrl(const QString &path) const
+{
+    if (path.trimmed().isEmpty() || !QFile::exists(path)) return QString();
+    return QUrl::fromLocalFile(path).toString();
+}
+
+QString SchoolApp::myPhoto() const
+{
+    if (m_userId <= 0) return QString();
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT COALESCE(photo,'') FROM users WHERE id=?");
+    q.addBindValue(m_userId);
+    return q.exec() && q.next() ? q.value(0).toString() : QString();
+}
+
+bool SchoolApp::setMyPhoto(const QString &path)
+{
+    if (m_userId <= 0) return false;
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE users SET photo=? WHERE id=?");
+    q.addBindValue(path.trimmed().isEmpty() ? QVariant() : QVariant(path));
+    q.addBindValue(m_userId);
+    if (!q.exec()) return false;
+    audit("update", "user_photo", m_userId, path.trimmed().isEmpty() ? QStringLiteral("retirée") : QStringLiteral("modifiée"));
+    emit dataChanged();
+    return true;
+}
+
+QString SchoolApp::studentPhotoPath(int studentId) const
+{
+    if (!canViewStudent(studentId)) return QString();
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT COALESCE(photo,'') FROM students WHERE id=?");
+    q.addBindValue(studentId);
+    return q.exec() && q.next() ? q.value(0).toString() : QString();
 }

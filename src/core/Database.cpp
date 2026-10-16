@@ -695,6 +695,10 @@ bool Database::migrate()
         && !exec("ALTER TABLE students ADD COLUMN entry_date TEXT"))
         return false;
 
+    if (!columnExists(QStringLiteral("users"), QStringLiteral("photo"))
+        && !exec("ALTER TABLE users ADD COLUMN photo TEXT"))
+        return false;
+
     if (!columnExists(QStringLiteral("payments"), QStringLiteral("receipt_number"))
         && !exec("ALTER TABLE payments ADD COLUMN receipt_number TEXT"))
         return false;
