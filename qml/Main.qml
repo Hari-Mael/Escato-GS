@@ -20,6 +20,11 @@ ApplicationWindow {
     title: "ESCATO — Gestion scolaire"
     color: "#F4F7FA"
 
+    FontLoader {
+        id: iconFont
+        source: "qrc:/assets/fonts/MaterialSymbolsRounded.ttf"
+    }
+
     Loader {
         anchors.fill: parent
         sourceComponent: school.loggedIn ? (school.currentRole === "parent" || school.currentRole === "eleve" ? familyComponent : appComponent) : (school.needsSetup ? setupComponent : loginComponent)
@@ -71,18 +76,11 @@ ApplicationWindow {
                             implicitWidth: 40
                             implicitHeight: 40
 
-                            Column {
+                            Icon {
                                 anchors.centerIn: parent
-                                spacing: 5
-                                Repeater {
-                                    model: 3
-                                    Rectangle {
-                                        width: 18
-                                        height: 2
-                                        radius: 1
-                                        color: menuArea.containsMouse ? "#0F9D8F" : "#0B7F74"
-                                    }
-                                }
+                                name: "menu"
+                                size: 24
+                                color: menuArea.containsMouse ? "#0F9D8F" : "#0B7F74"
                             }
 
                             MouseArea {

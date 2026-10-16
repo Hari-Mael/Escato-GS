@@ -33,6 +33,7 @@ qt_add_qml_module(escato_app
     QML_FILES
         qml/Main.qml
         qml/components/Sidebar.qml
+        qml/components/Icon.qml
         qml/components/StatCard.qml
         qml/components/Toast.qml
         qml/components/AppButton.qml
@@ -84,4 +85,4 @@ target_link_libraries(escato_app
     PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Sql Qt6::PrintSupport Qt6::Widgets Qt6::Network
 )
 
-qt_add_resources(escato_app escato_assets PREFIX "/" FILES assets/logo.png)
+qt_add_resources(escato_app escato_assets PREFIX "/" FILES assets/logo.png assets/fonts/MaterialSymbolsRounded.ttf)
