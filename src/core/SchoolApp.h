@@ -110,6 +110,7 @@ public:
     Q_INVOKABLE bool addTeacher(const QVariantMap &v);
     Q_INVOKABLE bool updateTeacher(int id, const QVariantMap &v);
     Q_INVOKABLE bool deleteTeacher(int id);
+    Q_INVOKABLE bool deleteUser(int id);
 
     Q_INVOKABLE QVariantList courses(const QString &className = QString()) const;
     Q_INVOKABLE bool addCourse(const QVariantMap &v);
