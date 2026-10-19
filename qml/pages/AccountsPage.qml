@@ -88,9 +88,16 @@ Item {
                         enabled: modelData.status !== "active"
                         onClicked: school.unblockUser(modelData.id)
                     }
+                    AppButton { text: "Supprimer"; visible: school.can("users.manage"); onClicked: confirmDel.ask(modelData.id) }
                 }
             }
         }
+    }
+
+    ConfirmDelete {
+        id: confirmDel
+        message: "Supprimer cet utilisateur ? Il ne pourra plus se connecter."
+        onConfirmed: function(id) { school.deleteUser(id) }
     }
 
     Dialog {

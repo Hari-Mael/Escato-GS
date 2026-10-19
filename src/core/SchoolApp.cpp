@@ -248,7 +248,7 @@ bool SchoolApp::addTeacher(const QVariantMap &v)
     if(v.value("password").toString().size()<kMinPasswordLength){emit errorOccurred(QStringLiteral("Le mot de passe doit contenir au moins %1 caractères.").arg(kMinPasswordLength));return false;}
     QSqlDatabase db=m_db.db();db.transaction();QSqlQuery q(db);
     q.prepare("INSERT INTO users(name,email,password_hash,role) VALUES(?,?,?, 'enseignant')");q.addBindValue(v["name"]);q.addBindValue(v["email"]);q.addBindValue(Database::hashPassword(v.value("password").toString()));
-    if(!q.exec()){db.rollback();return false;}int uid=q.lastInsertId().toInt();
+    if(!q.exec()){db.rollback();emit errorOccurred(q.lastError().text().contains("UNIQUE") ? QStringLiteral("Cet e-mail est déjà utilisé par un autre compte.") : q.lastError().text());return false;}int uid=q.lastInsertId().toInt();
     q.prepare(R"(INSERT INTO teacher_profiles(user_id,identity_number,cnaps_number,mle_number,contact,address,dob,place_of_birth,number_of_children,marital_status,religion,subject,occupation,employment_type,hiring_date,contract_end_date,comment,photo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?))");
     QStringList k={"cin","cnaps","mle","contact","address","dob","birthPlace","children","maritalStatus","religion","subject","occupation","employmentType","hiringDate","contractEndDate","comment","photo"};q.addBindValue(uid);for(auto &x:k)q.addBindValue(v.value(x));if(!q.exec()){db.rollback();return false;}db.commit();audit("create","teacher",uid);emit dataChanged();return true;
 }
@@ -3309,4 +3309,39 @@ QString SchoolApp::studentPhotoPath(int studentId) const
     q.prepare("SELECT COALESCE(photo,'') FROM students WHERE id=?");
     q.addBindValue(studentId);
     return q.exec() && q.next() ? q.value(0).toString() : QString();
+}
+
+bool SchoolApp::deleteUser(int id)
+{
+    if (!can("users.manage")) return false;
+    if (id == m_userId) {
+        emit errorOccurred(QStringLiteral("Vous ne pouvez pas supprimer votre propre compte."));
+        return false;
+    }
+    QSqlQuery role(m_db.db());
+    role.prepare("SELECT role FROM users WHERE id=? AND deleted_at IS NULL");
+    role.addBindValue(id);
+    if (!role.exec() || !role.next()) {
+        emit errorOccurred(QStringLiteral("Utilisateur introuvable."));
+        return false;
+    }
+    if (role.value(0).toString() == QLatin1String("administrateur")) {
+        QSqlQuery admins(m_db.db());
+        admins.prepare("SELECT COUNT(*) FROM users WHERE role='administrateur' AND deleted_at IS NULL AND id<>?");
+        admins.addBindValue(id);
+        if (!admins.exec() || !admins.next() || admins.value(0).toInt() == 0) {
+            emit errorOccurred(QStringLiteral("Impossible : c'est le dernier administrateur."));
+            return false;
+        }
+    }
+    QSqlQuery q(m_db.db());
+    q.prepare("UPDATE users SET deleted_at=CURRENT_TIMESTAMP, account_status='blocked', blocked_reason='Compte supprimé' WHERE id=? AND deleted_at IS NULL");
+    q.addBindValue(id);
+    if (!q.exec() || q.numRowsAffected() != 1) {
+        emit errorOccurred(q.lastError().text().isEmpty() ? QStringLiteral("Suppression impossible.") : q.lastError().text());
+        return false;
+    }
+    audit("delete", "user", id);
+    emit dataChanged();
+    return true;
 }

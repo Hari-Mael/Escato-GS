@@ -17,11 +17,13 @@ Item{
                     Label{text:modelData.subject;width:150}
                     Label{text:modelData.title;width:220}
                     Label{text:modelData.teacher;width:170}
-                    Label{text:modelData.description;width:250}
+                    Label{text:modelData.description;width:200}
+                    AppButton{text:"Supprimer";onClicked:confirmDel.ask(modelData.id)}
                 }
             }
         }
     }
+    ConfirmDelete{id:confirmDel;message:"Supprimer ce cours ?";onConfirmed:function(id){school.deleteCourse(id)}}
     Dialog{id:form;title:"Créer un cours";modal:true;anchors.centerIn:Overlay.overlay;standardButtons:Dialog.Ok|Dialog.Cancel
         Column{spacing:8;width:400
             AppTextField{id:title;placeholderText:"Titre"}

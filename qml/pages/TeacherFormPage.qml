@@ -37,6 +37,7 @@ Item{
         formError.text=""
         if(!name.text||!email.text||!cin.text||!contact.text||!subject.text||password.text.length<8){formError.text="Merci de remplir les champs marqués d'un * (mot de passe : 8 caractères minimum).";return}
         if(school.addTeacher(formData())){reset();saved()}
+        else formError.text="Enregistrement impossible : e-mail déjà utilisé ou champs invalides."
     }
     function reset(){photoPicker.path="";
         [name,email,password,cin,cnaps,mle,contact,address,dob,birthPlace,maritalStatus,religion,subject,occupation,hiringDate,contractEndDate,comment].forEach(function(f){f.text=""})

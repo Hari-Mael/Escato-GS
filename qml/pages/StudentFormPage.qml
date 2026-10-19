@@ -18,31 +18,39 @@ Item {
 
         ScrollView {
             Layout.fillWidth:true; Layout.fillHeight:true
+            contentWidth: availableWidth
             GridLayout {
                 PhotoPicker { id: photoPicker; Layout.columnSpan: 2 }
                 width: parent.width; columns:2; columnSpacing:20; rowSpacing:14
 
-                Label{text:"Matricule"} AppTextField{id: matricule; placeholderText:"Laisser vide pour génération automatique"; Layout.fillWidth:true}
-                Label{text:"Nom *"} AppTextField{id: lastName; Layout.fillWidth:true}
-                Label{text:"Prénom *"} AppTextField{id: firstName; Layout.fillWidth:true}
-                Label{text:"Date de naissance *"} AppTextField{id: birthDate; placeholderText:"AAAA-MM-JJ"; Layout.fillWidth:true}
-                Label{text:"Lieu de naissance"} AppTextField{id: birthPlace; Layout.fillWidth:true}
-                Label{text:"Père"} AppTextField{id: father; Layout.fillWidth:true}
-                Label{text:"Profession du père"} AppTextField{id: fatherJob; Layout.fillWidth:true}
-                Label{text:"Mère"} AppTextField{id: mother; Layout.fillWidth:true}
-                Label{text:"Profession de la mère"} AppTextField{id: motherJob; Layout.fillWidth:true}
-                Label{text:"Téléphone parent *"} AppTextField{id: parentPhone; Layout.fillWidth:true}
-                Label{text:"E-mail parent"} AppTextField{id: parentEmail; Layout.fillWidth:true}
-                Label{text:"Adresse *"} AppTextField{id: address; Layout.fillWidth:true}
-                Label{text:"Ancienne école"} AppTextField{id: previousSchool; Layout.fillWidth:true}
-                Label{text:"Ancienne classe"} AppTextField{id: previousClass; Layout.fillWidth:true}
-                Label{text:"Date d'entrée *"} AppTextField{id: entryDate; placeholderText:"AAAA-MM-JJ"; Layout.fillWidth:true}
-                Label{text:"Classe actuelle *"}
+                Label{Layout.preferredWidth:230;text:"Matricule"} AppTextField{id: matricule; placeholderText:"Laisser vide pour génération automatique"; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Nom *"} AppTextField{id: lastName; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Prénom *"} AppTextField{id: firstName; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Date de naissance *"} AppTextField{id: birthDate; placeholderText:"AAAA-MM-JJ"; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Lieu de naissance"} AppTextField{id: birthPlace; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Père"} AppTextField{id: father; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Profession du père"} AppTextField{id: fatherJob; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Mère"} AppTextField{id: mother; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Profession de la mère"} AppTextField{id: motherJob; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Téléphone parent *"} AppTextField{id: parentPhone; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"E-mail parent"} AppTextField{id: parentEmail; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Adresse *"} AppTextField{id: address; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Ancienne école"} AppTextField{id: previousSchool; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Ancienne classe"} AppTextField{id: previousClass; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Date d'entrée *"} AppTextField{id: entryDate; placeholderText:"AAAA-MM-JJ"; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Classe actuelle *"}
                 ComboBox { id: classBox; model:school.classes(); Layout.fillWidth:true }
-                Label{text:"Projet / carrière"} AppTextField{id: career; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Projet / carrière"} AppTextField{id: career; Layout.fillWidth:true}
 
                 Label { id: formError; Layout.columnSpan:2; color:"#C62828"; visible: text !== "" }
 
+                AppButton {
+                    Layout.columnSpan:2; Layout.alignment:Qt.AlignLeft
+                    visible: editingId > 0
+                    text: "Supprimer l'élève"
+                    palette.button: "#C62828"
+                    onClicked: confirmDelete.ask(editingId)
+                }
                 AppButton {
                     Layout.columnSpan:2; Layout.alignment:Qt.AlignRight
                     text:editingId?"Enregistrer les modifications":"Enregistrer l'élève"
@@ -51,6 +59,12 @@ Item {
                 }
             }
         }
+    }
+
+    ConfirmDelete {
+        id: confirmDelete
+        message: "Supprimer cet élève ? Il ne figurera plus dans les listes."
+        onConfirmed: function(id) { if (school.deleteStudent(id)) saved() }
     }
 
     function formData() {
@@ -81,6 +95,7 @@ Item {
         }
         var ok = editingId ? school.updateStudent(editingId,formData()) : school.addStudent(formData())
         if(ok) { reset(); saved() }
+        else formError.text = "Enregistrement impossible : vérifie les champs (matricule déjà utilisé ?)."
     }
 
     function reset() {
