@@ -16,6 +16,9 @@
 #include <QTimer>
 #include <QTime>
 #include <QSet>
+#include <QImage>
+#include <QBuffer>
+#include "third_party/qrcodegen/qrcodegen.hpp"
 #include <QStandardPaths>
 #include <QDir>
 #include <QUuid>
@@ -3344,4 +3347,36 @@ bool SchoolApp::deleteUser(int id)
     audit("delete", "user", id);
     emit dataChanged();
     return true;
+}
+
+QString SchoolApp::teacherQrText(int userId) const
+{
+    if (!(can("teachers.manage") || can("students.view"))) return QString();
+    QSqlQuery q(m_db.db());
+    q.prepare("SELECT u.name,u.email,COALESCE(t.subject,''),COALESCE(t.contact,'') FROM users u "
+              "LEFT JOIN teacher_profiles t ON t.user_id=u.id WHERE u.id=? AND u.deleted_at IS NULL");
+    q.addBindValue(userId);
+    if (!q.exec() || !q.next()) return QString();
+    return QStringLiteral("ESCATO GS - ENSEIGNANT\nNom : %1\nMatière : %2\nContact : %3\nE-mail : %4")
+        .arg(q.value(0).toString(), q.value(2).toString(), q.value(3).toString(), q.value(1).toString());
+}
+
+QString SchoolApp::qrCodePngDataUrl(const QString &text) const
+{
+    const QString t = text.trimmed();
+    if (t.isEmpty()) return QString();
+    const qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(t.toUtf8().constData(), qrcodegen::QrCode::Ecc::MEDIUM);
+    const int border = 4;
+    const int size = qr.getSize();
+    QImage img(size + 2 * border, size + 2 * border, QImage::Format_RGB32);
+    img.fill(Qt::white);
+    for (int y = 0; y < size; ++y)
+        for (int x = 0; x < size; ++x)
+            if (qr.getModule(x, y)) img.setPixel(x + border, y + border, qRgb(0, 0, 0));
+    img = img.scaled(img.width() * 6, img.height() * 6, Qt::KeepAspectRatio, Qt::FastTransformation);
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    img.save(&buffer, "PNG");
+    return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
 }
