@@ -111,6 +111,8 @@ public:
     Q_INVOKABLE bool updateTeacher(int id, const QVariantMap &v);
     Q_INVOKABLE bool deleteTeacher(int id);
     Q_INVOKABLE bool deleteUser(int id);
+    Q_INVOKABLE QString teacherQrText(int userId) const;
+    Q_INVOKABLE QString qrCodePngDataUrl(const QString &text) const;
 
     Q_INVOKABLE QVariantList courses(const QString &className = QString()) const;
     Q_INVOKABLE bool addCourse(const QVariantMap &v);

@@ -273,6 +273,8 @@ bool drawStudentCard(Page &pg, int studentId)
     if (!q.exec() || !q.next()) return false;
 
     const QString matricule = q.value(0).toString();
+    const QString qrPayload = QStringLiteral("ESCATO GS - ÉLÈVE\nMatricule : %1\nNom : %2 %3\nClasse : %4")
+        .arg(matricule, q.value(1).toString(), q.value(2).toString(), q.value(3).toString());
     const QString lastName = q.value(1).toString();
     const QString firstName = q.value(2).toString();
     const QString currentClass = q.value(3).toString();
@@ -328,7 +330,7 @@ bool drawStudentCard(Page &pg, int studentId)
     p.setFont(QFont("Arial", 10, QFont::Bold));
     pg.cell(x + 124, y + 186, 200, currentClass);
 
-    const qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(matricule.toUtf8().constData(),
+    const qrcodegen::QrCode qr = qrcodegen::QrCode::encodeText(qrPayload.toUtf8().constData(),
                                                                qrcodegen::QrCode::Ecc::MEDIUM);
     const int modules = qr.getSize();
     const int border = 2;
