@@ -78,7 +78,11 @@ Item {
                     anchors.fill: parent
                     anchors.margins: 12
                     spacing: 8
-                    Label { text: modelData.name; width: 160; elide: Text.ElideRight }
+                    Label {
+                        text: modelData.name; width: 160; elide: Text.ElideRight
+                        color: "#0B7F74"; font.underline: true
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: infoPopup.show(modelData.name, teacherInfo(modelData)) }
+                    }
                     Label { text: modelData.email; width: 190; elide: Text.ElideRight }
                     Label { text: modelData.subject; width: 130; elide: Text.ElideRight }
                     Label { text: modelData.contact; width: 130 }
@@ -88,6 +92,28 @@ Item {
                 }
             }
         }
+    }
+
+    InfoPopup { id: infoPopup }
+
+    function teacherInfo(t) {
+        return [
+            ["E-mail", t.email],
+            ["Statut du compte", t.status],
+            ["CIN", t.cin],
+            ["CNAPS", t.cnaps],
+            ["Numéro MLE", t.mle],
+            ["Contact", t.contact],
+            ["Adresse", t.address],
+            ["Date de naissance", t.dob],
+            ["Lieu de naissance", t.birthPlace],
+            ["Matière", t.subject],
+            ["Profession", t.occupation],
+            ["Type d'emploi", t.employmentType],
+            ["Situation matrimoniale", t.maritalStatus],
+            ["Nombre d'enfants", t.children],
+            ["Religion", t.religion]
+        ]
     }
 
     function refresh() { rows = school.teachers(searchText) }

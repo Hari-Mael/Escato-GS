@@ -36,6 +36,7 @@ qt_add_qml_module(escato_app
         qml/components/Icon.qml
         qml/components/PhotoPicker.qml
         qml/components/ConfirmDelete.qml
+        qml/components/InfoPopup.qml
         qml/components/StatCard.qml
         qml/components/Toast.qml
         qml/components/AppButton.qml
