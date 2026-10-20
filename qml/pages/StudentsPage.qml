@@ -65,8 +65,10 @@ Item {
                     width:list.width; height:55; color:index%2?"#FAFBFC":"white"
                     Row { anchors.fill:parent; anchors.leftMargin:12
                         Label { text:modelData.matricule; width:130 }
-                        Label { text:modelData.lastName; width:150 }
-                        Label { text:modelData.firstName; width:150 }
+                        Label { text:modelData.lastName; width:150; color:"#0B7F74"; font.underline:true
+                            MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked: infoPopup.show(modelData.lastName + " " + modelData.firstName, studentInfo(modelData)) } }
+                        Label { text:modelData.firstName; width:150; color:"#0B7F74"; font.underline:true
+                            MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked: infoPopup.show(modelData.lastName + " " + modelData.firstName, studentInfo(modelData)) } }
                         Label { text:modelData.className; width:110; font.bold:true }
                         Label { text:modelData.parentPhone; width:150 }
                         AppButton { text:"Profil"; onClicked: detailRequested(modelData.id) }
@@ -74,6 +76,28 @@ Item {
                 }
             }
         }
+    }
+
+    InfoPopup { id: infoPopup }
+
+    function studentInfo(s) {
+        return [
+            ["Matricule", s.matricule],
+            ["Nom", s.lastName],
+            ["Prénom", s.firstName],
+            ["Date de naissance", s.birthDate],
+            ["Lieu de naissance", s.birthPlace],
+            ["Classe", s.className],
+            ["Date d'entrée", s.entryDate],
+            ["Téléphone parent", s.parentPhone],
+            ["E-mail parent", s.parentEmail],
+            ["Adresse", s.address],
+            ["Ancienne école", s.previousSchool],
+            ["Ancienne classe", s.previousClass],
+            ["Projet / carrière", s.desiredCareer],
+            ["Statut du compte", s.accountStatus],
+            ["Paiements manqués", s.missedPayments]
+        ]
     }
 
     function refresh() { rows = school.students(selectedClass, searchText).filter(matchesStatus) }
