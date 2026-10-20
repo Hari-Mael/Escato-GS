@@ -169,8 +169,8 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8; visible: root.canCalendar
                         AppTextField { id: eventTitle; placeholderText: "Titre (ex. Rentrée, Fête nationale)"; Layout.fillWidth: true }
-                        AppTextField { id: eventStart; placeholderText: "Début AAAA-MM-JJ"; Layout.preferredWidth: 150 }
-                        AppTextField { id: eventEnd; placeholderText: "Fin AAAA-MM-JJ"; Layout.preferredWidth: 150 }
+                        AppTextField { id: eventStart; placeholderText: "Début JJ-MM-AAAA"; Layout.preferredWidth: 150 }
+                        AppTextField { id: eventEnd; placeholderText: "Fin JJ-MM-AAAA"; Layout.preferredWidth: 150 }
                         ComboBox { id: eventKind; Layout.preferredWidth: 130; model: root.eventLabels }
                         AppButton {
                             text: "Ajouter"; highlighted: true

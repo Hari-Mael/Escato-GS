@@ -24,7 +24,7 @@ Item{
             ComboBox{id:courseBox;width:parent.width;model:courseList;textRole:"label";valueRole:"id"}
             AppTextField{id:title;placeholderText:"Titre"}
             ComboBox{id:term;model:school.terms()}
-            AppTextField{id:date;placeholderText:"AAAA-MM-JJ"}
+            AppTextField{id:date;placeholderText:"JJ-MM-AAAA"}
             SpinBox{id:maxScore;from:1;to:100;value:20}
         }
         onAccepted:{if(courseBox.currentValue===undefined||!title.text||!/^\d{4}-\d{2}-\d{2}$/.test(date.text))return;school.addExam({courseId:courseBox.currentValue,title:title.text,term:term.currentText,date:date.text,maxScore:maxScore.value});title.text="";date.text=""}

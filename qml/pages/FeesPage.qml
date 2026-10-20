@@ -152,7 +152,7 @@ Item {
                             model: school.classes()
                         }
                         AppTextField { id: assignAmount; placeholderText: "Montant (Ar)"; Layout.preferredWidth: 140; inputMethodHints: Qt.ImhDigitsOnly }
-                        AppTextField { id: assignDue; placeholderText: "Échéance AAAA-MM-JJ"; Layout.preferredWidth: 170 }
+                        AppTextField { id: assignDue; placeholderText: "Échéance JJ-MM-AAAA"; Layout.preferredWidth: 170 }
                         AppButton {
                             text: "Assigner à la classe"
                             highlighted: true
@@ -181,8 +181,8 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 8
-                        AppTextField { id: fromDate; placeholderText: "Du AAAA-MM-JJ"; Layout.preferredWidth: 170 }
-                        AppTextField { id: toDate; placeholderText: "Au AAAA-MM-JJ"; Layout.preferredWidth: 170 }
+                        AppTextField { id: fromDate; placeholderText: "Du JJ-MM-AAAA"; Layout.preferredWidth: 170 }
+                        AppTextField { id: toDate; placeholderText: "Au JJ-MM-AAAA"; Layout.preferredWidth: 170 }
                         AppButton { text: "Actualiser"; highlighted: true; onClicked: root.refreshOverview() }
                         Label { text: "(vide = toutes les dates)"; color: "#667085" }
                     }

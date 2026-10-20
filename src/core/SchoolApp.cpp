@@ -28,6 +28,18 @@
 
 static constexpr int kMinPasswordLength = 8;
 
+static QDate parseAnyDate(const QString &text)
+{
+    const QString t = text.trimmed();
+    static const QStringList formats = {QStringLiteral("yyyy-MM-dd"), QStringLiteral("dd-MM-yyyy"),
+                                        QStringLiteral("dd/MM/yyyy"), QStringLiteral("dd.MM.yyyy")};
+    for (const QString &f : formats) {
+        const QDate d = QDate::fromString(t, f);
+        if (d.isValid()) return d;
+    }
+    return QDate();
+}
+
 SchoolApp::SchoolApp(QObject *parent) : QObject(parent)
 {
     m_emailTimer = new QTimer(this);
@@ -820,8 +832,8 @@ bool SchoolApp::addAcademicPeriod(const QVariantMap &v)
 {
     if (!can("periods.manage")) return false;
     const QString name = v.value("name").toString().trimmed();
-    const QDate start = QDate::fromString(v.value("startDate").toString().trimmed(), "yyyy-MM-dd");
-    const QDate end = QDate::fromString(v.value("endDate").toString().trimmed(), "yyyy-MM-dd");
+    const QDate start = parseAnyDate(v.value("startDate").toString().trimmed());
+    const QDate end = parseAnyDate(v.value("endDate").toString().trimmed());
     if (name.isEmpty() || !start.isValid() || !end.isValid() || end < start) {
         emit errorOccurred(QStringLiteral("Nom, date de début et date de fin valides requis (AAAA-MM-JJ)."));
         return false;
@@ -1064,7 +1076,7 @@ bool SchoolApp::addFeeType(const QVariantMap &v)
 bool SchoolApp::assignOneTimeFeeToClass(int feeTypeId, const QString &className, double amount, const QString &dueDate)
 {
     if (!can("fees.onetime.manage")) return false;
-    const QDate due = QDate::fromString(dueDate.trimmed(), "yyyy-MM-dd");
+    const QDate due = parseAnyDate(dueDate.trimmed());
     if (!due.isValid() || amount < 0 || !classes().contains(className)) {
         emit errorOccurred(QStringLiteral("Classe, montant et échéance (AAAA-MM-JJ) valides requis."));
         return false;
@@ -1387,7 +1399,7 @@ QVariantList SchoolApp::attendanceFor(const QString &className, const QString &d
 bool SchoolApp::setAttendance(int studentId, const QString &day, const QString &status)
 {
     if (!can("attendance.record")) return false;
-    if (!QDate::fromString(day, "yyyy-MM-dd").isValid()) return false;
+    if (!parseAnyDate(day).isValid()) return false;
     if (!QStringList({"present", "absent", "late", "excused"}).contains(status)) return false;
     QSqlQuery q(m_db.db());
     q.prepare("INSERT INTO attendance(student_id,day,status) VALUES(?,?,?) "
@@ -1425,7 +1437,7 @@ bool SchoolApp::addIncident(const QVariantMap &v)
 {
     if (!can("discipline.record")) return false;
     const int studentId = v.value("studentId").toInt();
-    const QDate date = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const QDate date = parseAnyDate(v.value("date").toString());
     const QString category = v.value("category").toString().trimmed();
     if (studentId <= 0 || !date.isValid() || category.isEmpty()) {
         emit errorOccurred(QStringLiteral("Élève, date (AAAA-MM-JJ) et catégorie requis."));
@@ -1687,8 +1699,8 @@ bool SchoolApp::addCalendarEvent(const QVariantMap &v)
 {
     if (!can("calendar.manage")) return false;
     const QString title = v.value("title").toString().trimmed();
-    const QDate start = QDate::fromString(v.value("startDate").toString(), "yyyy-MM-dd");
-    const QDate end = QDate::fromString(v.value("endDate").toString(), "yyyy-MM-dd");
+    const QDate start = parseAnyDate(v.value("startDate").toString());
+    const QDate end = parseAnyDate(v.value("endDate").toString());
     const QString kind = v.value("kind").toString();
     if (title.isEmpty() || !start.isValid() || !end.isValid() || end < start
         || !QStringList({"evenement", "ferie", "vacances"}).contains(kind)) {
@@ -1917,8 +1929,8 @@ bool SchoolApp::addAccountingPeriod(const QVariantMap &v)
 {
     if (!can("closing.manage")) return false;
     const QString label = v.value("label").toString().trimmed();
-    const QDate start = QDate::fromString(v.value("startDate").toString(), "yyyy-MM-dd");
-    const QDate end = QDate::fromString(v.value("endDate").toString(), "yyyy-MM-dd");
+    const QDate start = parseAnyDate(v.value("startDate").toString());
+    const QDate end = parseAnyDate(v.value("endDate").toString());
     if (label.isEmpty() || !start.isValid() || !end.isValid() || end < start) {
         emit errorOccurred(QStringLiteral("Libellé et dates valides (AAAA-MM-JJ, fin après début) requis."));
         return false;
@@ -1970,7 +1982,7 @@ QVariantList SchoolApp::cashMovements(const QString &date) const
 bool SchoolApp::addCashMovement(const QVariantMap &v)
 {
     if (!can("cash.manage")) return false;
-    const QDate date = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const QDate date = parseAnyDate(v.value("date").toString());
     const QString kind = v.value("kind").toString();
     const double amount = v.value("amount").toDouble();
     const QString label = v.value("label").toString().trimmed();
@@ -2009,7 +2021,7 @@ QVariantMap SchoolApp::cashExpected(const QString &date) const
 bool SchoolApp::closeCash(const QString &date, double counted)
 {
     if (!can("cash.manage")) return false;
-    const QDate d = QDate::fromString(date.trimmed(), "yyyy-MM-dd");
+    const QDate d = parseAnyDate(date.trimmed());
     if (!d.isValid() || counted < 0) { emit errorOccurred(QStringLiteral("Date et montant compté valides requis.")); return false; }
     const double expected = cashExpected(d.toString("yyyy-MM-dd")).value("expected").toDouble();
     QSqlQuery q(m_db.db());
@@ -2111,7 +2123,7 @@ QVariantList SchoolApp::bankLines(int accountId) const
 bool SchoolApp::addBankLine(const QVariantMap &v)
 {
     if (!can("bank.manage")) return false;
-    const QDate d = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const QDate d = parseAnyDate(v.value("date").toString());
     const double amount = v.value("amount").toDouble();
     if (!d.isValid() || amount == 0 || v.value("label").toString().trimmed().isEmpty()) {
         emit errorOccurred(QStringLiteral("Date, libellé et montant (non nul, + ou -) requis."));
@@ -2204,7 +2216,7 @@ QVariantList SchoolApp::studentSchedule(int studentId) const
 bool SchoolApp::addScheduleInstallment(int studentId, const QString &label, const QString &dueDate, double amount)
 {
     if (!can("schedule.manage")) return false;
-    const QDate d = QDate::fromString(dueDate.trimmed(), "yyyy-MM-dd");
+    const QDate d = parseAnyDate(dueDate.trimmed());
     if (studentId <= 0 || label.trimmed().isEmpty() || !d.isValid() || amount <= 0) {
         emit errorOccurred(QStringLiteral("Élève, libellé, échéance (AAAA-MM-JJ) et montant (> 0) requis."));
         return false;
@@ -2552,10 +2564,11 @@ QVariantMap SchoolApp::importStudentsCsv(const QString &csv)
             errors << where + QStringLiteral("classe inconnue « %1 »").arg(row.value("className").toString());
             continue;
         }
-        if (!QDate::fromString(row.value("birthDate").toString(), "yyyy-MM-dd").isValid()) {
+        if (!parseAnyDate(row.value("birthDate").toString()).isValid()) {
             errors << where + QStringLiteral("date de naissance invalide (AAAA-MM-JJ attendu)");
             continue;
         }
+        row["birthDate"] = parseAnyDate(row.value("birthDate").toString()).toString("yyyy-MM-dd");
         QSqlQuery dup(m_db.db());
         dup.prepare("SELECT COUNT(*) FROM students WHERE last_name=? AND first_name=? AND birth_date=? AND deleted_at IS NULL");
         dup.addBindValue(row.value("lastName").toString());
@@ -2818,7 +2831,7 @@ void SchoolApp::runScheduledEmails()
 namespace {
 QDate hrPeriodEnd(const QString &period)
 {
-    const QDate first = QDate::fromString(period + "-01", "yyyy-MM-dd");
+    const QDate first = parseAnyDate(period + "-01");
     return first.isValid() ? first.addMonths(1).addDays(-1) : QDate();
 }
 }
@@ -2901,7 +2914,7 @@ bool SchoolApp::addHrEmployee(const QVariantMap &v)
     const QString name = v.value("name").toString().trimmed();
     const double base = v.value("baseSalary").toDouble();
     const QString start = v.value("startDate").toString().trimmed();
-    if (name.isEmpty() || base < 0 || (!start.isEmpty() && !QDate::fromString(start, "yyyy-MM-dd").isValid())) {
+    if (name.isEmpty() || base < 0 || (!start.isEmpty() && !parseAnyDate(start).isValid())) {
         emit errorOccurred(QStringLiteral("Nom, salaire de base (≥ 0) et date de début (AAAA-MM-JJ) valides requis."));
         return false;
     }
@@ -2952,7 +2965,7 @@ QVariantList SchoolApp::hrAttendanceFor(const QString &day) const
 bool SchoolApp::setHrAttendance(int employeeId, const QString &day, const QString &status)
 {
     if (!can("hr.manage")) return false;
-    if (!QDate::fromString(day, "yyyy-MM-dd").isValid() || !QStringList({"present", "absent", "late", "leave"}).contains(status)) return false;
+    if (!parseAnyDate(day).isValid() || !QStringList({"present", "absent", "late", "leave"}).contains(status)) return false;
     QSqlQuery q(m_db.db());
     q.prepare("INSERT INTO hr_attendance(employee_id,day,status) VALUES(?,?,?) ON CONFLICT(employee_id,day) DO UPDATE SET status=excluded.status");
     q.addBindValue(employeeId);
@@ -2986,8 +2999,8 @@ QVariantList SchoolApp::hrLeaves() const
 bool SchoolApp::addHrLeave(const QVariantMap &v)
 {
     if (!can("hr.manage")) return false;
-    const QDate s = QDate::fromString(v.value("startDate").toString(), "yyyy-MM-dd");
-    const QDate e = QDate::fromString(v.value("endDate").toString(), "yyyy-MM-dd");
+    const QDate s = parseAnyDate(v.value("startDate").toString());
+    const QDate e = parseAnyDate(v.value("endDate").toString());
     const QString kind = v.value("kind").toString().trimmed();
     if (v.value("employeeId").toInt() <= 0 || kind.isEmpty() || !s.isValid() || !e.isValid() || e < s) {
         emit errorOccurred(QStringLiteral("Salarié, type et dates valides (AAAA-MM-JJ, fin après début) requis."));
@@ -3040,7 +3053,7 @@ QVariantList SchoolApp::hrAdvances() const
 bool SchoolApp::addHrAdvance(const QVariantMap &v)
 {
     if (!can("hr.payroll")) return false;
-    const QDate d = QDate::fromString(v.value("date").toString(), "yyyy-MM-dd");
+    const QDate d = parseAnyDate(v.value("date").toString());
     const double amount = v.value("amount").toDouble();
     if (v.value("employeeId").toInt() <= 0 || !d.isValid() || amount <= 0) {
         emit errorOccurred(QStringLiteral("Salarié, date et montant (> 0) requis."));
@@ -3379,4 +3392,85 @@ QString SchoolApp::qrCodePngDataUrl(const QString &text) const
     buffer.open(QIODevice::WriteOnly);
     img.save(&buffer, "PNG");
     return QStringLiteral("data:image/png;base64,") + QString::fromLatin1(bytes.toBase64());
+}
+
+QVariantMap SchoolApp::importTeachersCsv(const QString &csv)
+{
+    QVariantMap out;
+    QVariantList errors;
+    int imported = 0;
+    if (!can("teachers.manage")) {
+        emit errorOccurred(QStringLiteral("Droit insuffisant pour importer des enseignants."));
+        out["imported"] = 0; out["rejected"] = 0; out["errors"] = errors;
+        return out;
+    }
+    QStringList lines;
+    for (const QString &raw : csv.split('\n')) {
+        const QString line = raw.trimmed();
+        if (!line.isEmpty()) lines << line;
+    }
+    if (lines.size() < 2) {
+        errors << QStringLiteral("Il faut une ligne d'en-tête et au moins une ligne d'enseignant.");
+        out["imported"] = 0; out["rejected"] = errors.size(); out["errors"] = errors;
+        return out;
+    }
+    const QChar delim = lines.first().contains(';') ? QChar(';') : QChar(',');
+    auto clean = [](QString f) { f = f.trimmed(); if (f.startsWith('"') && f.endsWith('"') && f.size() >= 2) f = f.mid(1, f.size() - 2); return f.trimmed(); };
+    auto normKey = [](QString k) { k = k.trimmed().toLower(); k.remove('_'); k.remove(' '); k.remove('-'); return k; };
+    QVariantMap alias;
+    alias["nom"] = "name"; alias["name"] = "name";
+    alias["email"] = "email"; alias["courriel"] = "email";
+    alias["matiere"] = "subject"; alias["subject"] = "subject";
+    alias["contact"] = "contact"; alias["telephone"] = "contact";
+    alias["cin"] = "cin";
+    alias["motdepasse"] = "password"; alias["password"] = "password";
+    QVariantList columns;
+    for (const QString &h : lines.first().split(delim)) columns << alias.value(normKey(clean(h)), QString()).toString();
+    QStringList missing;
+    for (const QString &r : QStringList{"name", "email", "password"}) if (!columns.contains(r)) missing << r;
+    if (!missing.isEmpty()) {
+        errors << QStringLiteral("Colonnes manquantes dans l'en-tête : ") + missing.join(", ");
+        out["imported"] = 0; out["rejected"] = errors.size(); out["errors"] = errors;
+        return out;
+    }
+    for (int i = 1; i < lines.size(); ++i) {
+        const QStringList fields = lines.at(i).split(delim);
+        QVariantMap row;
+        for (int c = 0; c < columns.size() && c < fields.size(); ++c) {
+            const QString key = columns.at(c).toString();
+            if (!key.isEmpty()) row[key] = clean(fields.at(c));
+        }
+        const QString where = QStringLiteral("Ligne %1 : ").arg(i + 1);
+        if (row.value("name").toString().isEmpty() || row.value("email").toString().isEmpty() || row.value("password").toString().isEmpty()) {
+            errors << where + QStringLiteral("nom, e-mail et mot de passe obligatoires");
+            continue;
+        }
+        if (addTeacher(row)) ++imported;
+        else errors << where + QStringLiteral("enregistrement refusé (e-mail déjà utilisé ou mot de passe trop court)");
+    }
+    audit("import", "teachers", imported, QStringLiteral("%1 enseignants importés").arg(imported));
+    if (imported > 0) emit dataChanged();
+    out["imported"] = imported;
+    out["rejected"] = errors.size();
+    out["errors"] = errors;
+    return out;
+}
+
+QString SchoolApp::readTextFile(const QString &fileUrl) const
+{
+    if (!(can("students.create") || can("teachers.manage"))) return QString();
+    const QUrl url(fileUrl);
+    const QString local = url.isLocalFile() ? url.toLocalFile() : fileUrl;
+    QFile f(local);
+    if (!f.open(QIODevice::ReadOnly)) return QString();
+    const QByteArray data = f.readAll();
+    QString text = QString::fromUtf8(data);
+    if (text.contains(QChar::ReplacementCharacter)) text = QString::fromLatin1(data);
+    return text;
+}
+
+QString SchoolApp::logoUrl() const
+{
+    const QString u = photoUrl(setting("school_logo"));
+    return u.isEmpty() ? QStringLiteral("qrc:/assets/logo.png") : u;
 }

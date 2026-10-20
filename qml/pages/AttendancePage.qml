@@ -29,7 +29,7 @@ Item {
             Layout.fillWidth: true; spacing: 10
             ComboBox { id: classBox; Layout.preferredWidth: 200; model: school.classes(); onCurrentTextChanged: root.refresh() }
             AppTextField { id: dayField; text: Qt.formatDate(new Date(), "yyyy-MM-dd"); Layout.preferredWidth: 170; onTextChanged: root.refresh() }
-            Label { text: "(date AAAA-MM-JJ)"; color: "#667085" }
+            Label { text: "(date JJ-MM-AAAA)"; color: "#667085" }
         }
 
         Rectangle {

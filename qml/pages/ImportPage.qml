@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import "../components"
 
 Item {
@@ -27,7 +28,7 @@ Item {
                     x: 20; y: 20; width: parent.width - 40; spacing: 8
                     Label { text: "Importer des élèves"; font.pixelSize: 18; font.bold: true }
                     Label {
-                        text: "Copiez vos élèves depuis un tableur (Excel, LibreOffice) et collez-les ci-dessous, en gardant la première ligne d'en-tête. Colonnes obligatoires : nom, prenom, date_naissance (AAAA-MM-JJ), classe, telephone_parent, adresse. Colonnes facultatives : lieu_naissance, email_parent."
+                        text: "Copiez vos élèves depuis un tableur (Excel, LibreOffice) et collez-les ci-dessous, en gardant la première ligne d'en-tête. Colonnes obligatoires : nom, prenom, date_naissance (JJ-MM-AAAA), classe, telephone_parent, adresse. Colonnes facultatives : lieu_naissance, email_parent."
                         color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true
                     }
                     Label { text: "Modèle d'en-tête :"; font.bold: true }
@@ -36,6 +37,21 @@ Item {
                         readOnly: true
                         selectByMouse: true
                         text: root.template
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true; spacing: 8
+                        Label { text: "Type :" }
+                        ComboBox { id: importType; Layout.preferredWidth: 200; model: ["Élèves", "Enseignants"] }
+                        AppButton { text: "Choisir un fichier CSV…"; onClicked: fileDialog.open() }
+                        Label {
+                            text: "Excel : Enregistrer sous → CSV (séparateur ;). Access : exporter la table en CSV."
+                            color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true
+                        }
+                    }
+                    FileDialog {
+                        id: fileDialog
+                        nameFilters: ["Fichiers CSV (*.csv *.txt)"]
+                        onAccepted: csvInput.text = school.readTextFile(selectedFile.toString())
                     }
                     Label { text: "Données à importer :"; font.bold: true }
                     TextArea {
@@ -50,14 +66,14 @@ Item {
                         Layout.fillWidth: true; spacing: 8
                         AppButton {
                             text: "Importer les élèves"; highlighted: true
-                            onClicked: root.result = school.importStudentsCsv(csvInput.text)
+                            onClicked: root.result = importType.currentIndex === 0 ? school.importStudentsCsv(csvInput.text) : school.importTeachersCsv(csvInput.text)
                         }
                         AppButton { text: "Vider"; onClicked: { csvInput.text = ""; root.result = ({}) } }
                         Item { Layout.fillWidth: true }
                     }
                     Label {
                         visible: root.result.imported !== undefined
-                        text: "Élèves importés : " + (root.result.imported || 0) + "   ·   Lignes refusées : " + (root.result.rejected || 0)
+                        text: (importType.currentIndex === 0 ? "Élèves importés : " : "Enseignants importés : ") + (root.result.imported || 0) + "   ·   Lignes refusées : " + (root.result.rejected || 0)
                         font.bold: true
                         color: (root.result.rejected || 0) === 0 ? "#0F9D8F" : "#B7791F"
                     }
