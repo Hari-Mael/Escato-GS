@@ -13,11 +13,13 @@ Rectangle {
 
     property string currentPage: "dashboard"
     property string myPhotoUrl: ""
+    property string logoSource: "qrc:/assets/logo.png"
     signal navigate(string page)
 
     property var perms: ({})
     function refreshPerms() {
         myPhotoUrl = school.photoUrl(school.myPhoto())
+        logoSource = school.logoUrl()
         perms = {
             "audit": school.can("audit.view"),
             "fees": school.can("balances.view"),
@@ -69,7 +71,7 @@ Rectangle {
 
         Image {
             id: logo
-            source: "qrc:/assets/logo.png"
+            source: root.logoSource
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredHeight: 96
             Layout.preferredWidth: 80

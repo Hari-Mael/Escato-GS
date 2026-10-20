@@ -162,8 +162,8 @@ Item {
                     Label { text: "États financiers et analytiques"; font.pixelSize: 18; font.bold: true }
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
-                        AppTextField { id: fromDate; placeholderText: "Du AAAA-MM-JJ"; Layout.preferredWidth: 160 }
-                        AppTextField { id: toDate; placeholderText: "Au AAAA-MM-JJ"; Layout.preferredWidth: 160 }
+                        AppTextField { id: fromDate; placeholderText: "Du JJ-MM-AAAA"; Layout.preferredWidth: 160 }
+                        AppTextField { id: toDate; placeholderText: "Au JJ-MM-AAAA"; Layout.preferredWidth: 160 }
                         AppButton { text: "Afficher"; highlighted: true; onClicked: root.refresh() }
                     }
                     Label { text: "Produits (encaissements) : " + root.fmt(root.statement.revenue || 0); font.bold: true; color: "#0F9D8F" }

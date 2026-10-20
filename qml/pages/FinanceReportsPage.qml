@@ -61,7 +61,7 @@ Item {
             Layout.fillWidth: true; spacing: 8
             visible: root.reportIndex === 0
             Label { text: "Impayés au" }
-            AppTextField { id: asOfDate; Layout.preferredWidth: 160; placeholderText: "AAAA-MM-JJ (vide = aujourd'hui)" }
+            AppTextField { id: asOfDate; Layout.preferredWidth: 160; placeholderText: "JJ-MM-AAAA (vide = aujourd'hui)" }
             AppButton { text: "Actualiser"; highlighted: true; onClicked: root.refresh() }
         }
         RowLayout {

@@ -95,6 +95,22 @@ Item {
             }
 
             Rectangle {
+                Layout.fillWidth: true; radius: 12; color: "white"; border.color: "#E5EAEE"
+                implicitHeight: logoColumn.implicitHeight + 40
+                ColumnLayout {
+                    id: logoColumn
+                    x: 20; y: 20; width: parent.width - 40; spacing: 10
+                    Label { text: "Logo de l'établissement"; font.pixelSize: 18; font.bold: true }
+                    Label { text: "Ce logo apparaît dans le menu latéral. Formats JPG ou PNG."; color: "#667085"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    PhotoPicker {
+                        size: 120
+                        path: school.setting("school_logo")
+                        onPhotoChanged: function(p) { school.setSetting("school_logo", p) }
+                    }
+                }
+            }
+
+            Rectangle {
                 Layout.fillWidth: true
                 radius: 12
                 color: "white"
@@ -166,8 +182,8 @@ Item {
                         visible: root.canPeriods
                         spacing: 8
                         AppTextField { id: periodName; placeholderText: "Ex. 2026 – 2027"; Layout.fillWidth: true }
-                        AppTextField { id: periodStart; placeholderText: "Début AAAA-MM-JJ"; Layout.preferredWidth: 170 }
-                        AppTextField { id: periodEnd; placeholderText: "Fin AAAA-MM-JJ"; Layout.preferredWidth: 170 }
+                        AppTextField { id: periodStart; placeholderText: "Début JJ-MM-AAAA"; Layout.preferredWidth: 170 }
+                        AppTextField { id: periodEnd; placeholderText: "Fin JJ-MM-AAAA"; Layout.preferredWidth: 170 }
                         AppButton {
                             text: "Ajouter"
                             highlighted: true

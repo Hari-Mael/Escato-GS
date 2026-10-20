@@ -108,7 +108,7 @@ Item {
                         ComboBox { id: eDep; Layout.preferredWidth: 160; model: root.departmentRows; textRole: "name"; valueRole: "id" }
                         ComboBox { id: ePos; Layout.preferredWidth: 160; model: root.positionRows; textRole: "name"; valueRole: "id" }
                         AppTextField { id: eContract; placeholderText: "Contrat (CDI, CDD…)"; Layout.preferredWidth: 150 }
-                        AppTextField { id: eStart; placeholderText: "Début AAAA-MM-JJ"; Layout.preferredWidth: 150 }
+                        AppTextField { id: eStart; placeholderText: "Début JJ-MM-AAAA"; Layout.preferredWidth: 150 }
                         AppTextField { id: eSalary; placeholderText: "Salaire de base"; Layout.preferredWidth: 150; inputMethodHints: Qt.ImhDigitsOnly }
                         AppButton {
                             text: "Ajouter"; highlighted: true
@@ -128,7 +128,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
                         AppTextField { id: attDay; text: root.today; Layout.preferredWidth: 150; onTextChanged: root.refresh() }
-                        Label { text: "(date AAAA-MM-JJ)"; color: "#667085" }
+                        Label { text: "(date JJ-MM-AAAA)"; color: "#667085" }
                     }
                     Repeater {
                         model: root.attendanceRows
@@ -159,8 +159,8 @@ Item {
                         Layout.fillWidth: true; spacing: 8; visible: root.canHr
                         ComboBox { id: lvEmp; Layout.preferredWidth: 240; model: root.employeeOptions; textRole: "label"; valueRole: "id" }
                         AppTextField { id: lvKind; placeholderText: "Type (congé annuel, maladie…)"; Layout.preferredWidth: 200 }
-                        AppTextField { id: lvStart; placeholderText: "Début AAAA-MM-JJ"; Layout.preferredWidth: 150 }
-                        AppTextField { id: lvEnd; placeholderText: "Fin AAAA-MM-JJ"; Layout.preferredWidth: 150 }
+                        AppTextField { id: lvStart; placeholderText: "Début JJ-MM-AAAA"; Layout.preferredWidth: 150 }
+                        AppTextField { id: lvEnd; placeholderText: "Fin JJ-MM-AAAA"; Layout.preferredWidth: 150 }
                         AppButton { text: "Enregistrer la demande"; highlighted: true
                             onClicked: school.addHrLeave({employeeId: lvEmp.currentValue, kind: lvKind.text, startDate: lvStart.text, endDate: lvEnd.text}) }
                     }

@@ -26,7 +26,7 @@ Item {
                 Label{Layout.preferredWidth:230;text:"Matricule"} AppTextField{id: matricule; placeholderText:"Laisser vide pour génération automatique"; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Nom *"} AppTextField{id: lastName; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Prénom *"} AppTextField{id: firstName; Layout.fillWidth:true}
-                Label{Layout.preferredWidth:230;text:"Date de naissance *"} AppTextField{id: birthDate; placeholderText:"AAAA-MM-JJ"; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Date de naissance *"} AppTextField{id: birthDate; placeholderText:"JJ-MM-AAAA"; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Lieu de naissance"} AppTextField{id: birthPlace; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Père"} AppTextField{id: father; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Profession du père"} AppTextField{id: fatherJob; Layout.fillWidth:true}
@@ -37,7 +37,7 @@ Item {
                 Label{Layout.preferredWidth:230;text:"Adresse *"} AppTextField{id: address; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Ancienne école"} AppTextField{id: previousSchool; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Ancienne classe"} AppTextField{id: previousClass; Layout.fillWidth:true}
-                Label{Layout.preferredWidth:230;text:"Date d'entrée *"} AppTextField{id: entryDate; placeholderText:"AAAA-MM-JJ"; Layout.fillWidth:true}
+                Label{Layout.preferredWidth:230;text:"Date d'entrée *"} AppTextField{id: entryDate; placeholderText:"JJ-MM-AAAA"; Layout.fillWidth:true}
                 Label{Layout.preferredWidth:230;text:"Classe actuelle *"}
                 ComboBox { id: classBox; model:school.classes(); Layout.fillWidth:true }
                 Label{Layout.preferredWidth:230;text:"Projet / carrière"} AppTextField{id: career; Layout.fillWidth:true}
@@ -69,14 +69,22 @@ Item {
 
     function formData() {
         return {
-            lastName:lastName.text, firstName:firstName.text, birthDate:birthDate.text,
+            lastName:lastName.text, firstName:firstName.text, birthDate:toIso(birthDate.text),
             birthPlace:birthPlace.text, fatherName:father.text, fatherJob:fatherJob.text,
             motherName:mother.text, motherJob:motherJob.text, parentPhone:parentPhone.text,
             parentEmail:parentEmail.text, address:address.text, previousSchool:previousSchool.text,
             previousClass:previousClass.text, className:classBox.currentText,
-            desiredCareer:career.text, photo:photoPicker.path, entryDate:entryDate.text,
+            desiredCareer:career.text, photo:photoPicker.path, entryDate:toIso(entryDate.text),
             matricule:matricule.text.trim()
         }
+    }
+
+    function isDateText(t) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(t) || /^\d{2}[-\/.]\d{2}[-\/.]\d{4}$/.test(t)
+    }
+    function toIso(t) {
+        var m = /^(\d{2})[-\/.](\d{2})[-\/.](\d{4})$/.exec(t)
+        return m ? m[3] + "-" + m[2] + "-" + m[1] : t
     }
 
     function save() {
@@ -85,12 +93,12 @@ Item {
             formError.text = "Merci de remplir tous les champs marqués d'un *."
             return
         }
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate.text)) {
-            formError.text = "La date de naissance doit être au format AAAA-MM-JJ."
+        if (!isDateText(birthDate.text)) {
+            formError.text = "La date de naissance doit être au format JJ-MM-AAAA."
             return
         }
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate.text)) {
-            formError.text = "La date d'entrée doit être au format AAAA-MM-JJ."
+        if (!isDateText(entryDate.text)) {
+            formError.text = "La date d'entrée doit être au format JJ-MM-AAAA."
             return
         }
         var ok = editingId ? school.updateStudent(editingId,formData()) : school.addStudent(formData())

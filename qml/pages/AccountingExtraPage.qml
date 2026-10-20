@@ -67,8 +67,8 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
                         AppTextField { id: periodLabel; placeholderText: "Libellé (ex. Octobre 2026)"; Layout.preferredWidth: 220 }
-                        AppTextField { id: periodStart; placeholderText: "Début AAAA-MM-JJ"; Layout.preferredWidth: 150 }
-                        AppTextField { id: periodEnd; placeholderText: "Fin AAAA-MM-JJ"; Layout.preferredWidth: 150 }
+                        AppTextField { id: periodStart; placeholderText: "Début JJ-MM-AAAA"; Layout.preferredWidth: 150 }
+                        AppTextField { id: periodEnd; placeholderText: "Fin JJ-MM-AAAA"; Layout.preferredWidth: 150 }
                         AppButton {
                             text: "Ajouter la période"; highlighted: true
                             onClicked: if (school.addAccountingPeriod({label: periodLabel.text, startDate: periodStart.text, endDate: periodEnd.text})) { periodLabel.text = ""; periodStart.text = ""; periodEnd.text = "" }
@@ -251,7 +251,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
                         AppTextField { id: schedLabel; placeholderText: "Libellé (ex. 1re tranche)"; Layout.fillWidth: true }
-                        AppTextField { id: schedDate; placeholderText: "Échéance AAAA-MM-JJ"; Layout.preferredWidth: 160 }
+                        AppTextField { id: schedDate; placeholderText: "Échéance JJ-MM-AAAA"; Layout.preferredWidth: 160 }
                         AppTextField { id: schedAmount; placeholderText: "Montant"; Layout.preferredWidth: 130; inputMethodHints: Qt.ImhDigitsOnly }
                         AppButton {
                             text: "Ajouter l'échéance"; highlighted: true
