@@ -21,6 +21,7 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\dist-installer
 OutputBaseFilename=ESCATO-Setup
+SetupIconFile=..\assets\app.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

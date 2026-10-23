@@ -89,3 +89,7 @@ target_link_libraries(escato_app
 )
 
 qt_add_resources(escato_app escato_assets PREFIX "/" FILES assets/logo.png assets/fonts/MaterialSymbolsRounded.ttf)
+
+if(WIN32)
+    target_sources(escato_app PRIVATE src/app.rc)
+endif()
